@@ -2,7 +2,7 @@
 - Wed Apr 26 07:12:45 JST 2023
   - done
     - sha2_evp
-    - shake128, shake256
+    - shake128/shake256 streaming input/output
       - openssl-1.1.1t
       - openssl-3.1.0
   - todo
