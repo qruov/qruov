@@ -1,2 +1,15 @@
 ### qruov
-Wed Mar 29 22:15:04 JST 2023
+- Wed Apr 26 07:12:45 JST 2023
+  - done
+    - sha2 evp
+    - shake128 / shake256
+      - openssl-1.1.1t
+      - openssl-3.1.0
+  - todo
+    - Strassen Algorithm
+    - Wiedemann Algorithm
+    - avx2
+    - avx512
+    - avx
+    - Secret Independent Rejection Sampling
+    - aes
