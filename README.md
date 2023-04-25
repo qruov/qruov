@@ -1,8 +1,8 @@
 ### qruov
 - Wed Apr 26 07:12:45 JST 2023
   - done
-    - sha2 evp
-    - shake128 / shake256
+    - sha2_evp
+    - shake128, shake256
       - openssl-1.1.1t
       - openssl-3.1.0
   - todo
@@ -12,4 +12,4 @@
     - avx512
     - avx
     - Secret Independent Rejection Sampling
-    - aes
+    - aes256_ctr_drbg
