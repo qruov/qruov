@@ -6,6 +6,7 @@
       - openssl-1.1.1t
       - openssl-3.1.0
   - todo
+    - sampling order of P1 and P2
     - Strassen Algorithm
     - Wiedemann Algorithm
     - portable
