@@ -8,7 +8,11 @@
   - todo
     - Strassen Algorithm
     - Wiedemann Algorithm
+    - portable
+      - 21 bit accumulation for extension of degree 3
+      - 16 bit accumulation
     - avx2
+      - Montgomery reduction
     - avx512
     - avx
     - Secret Independent Rejection Sampling
