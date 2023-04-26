@@ -5,8 +5,8 @@
     - shake128/shake256 streaming input/output
       - openssl-1.1.1t
       - openssl-3.1.0
-  - todo
     - sampling order of P1 and P2
+  - todo
     - Strassen Algorithm
     - Wiedemann Algorithm
     - portable
