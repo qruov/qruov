@@ -1,5 +1,5 @@
 ### qruov
-- Wed Apr 26 07:12:45 JST 2023
+- Wed May 17 12:41:14 JST 2023
   - done
     - sha2_evp
     - shake128/shake256 streaming input/output
@@ -7,14 +7,13 @@
       - openssl-3.1.0
     - sampling order of P1 and P2
   - todo
-    - Strassen Algorithm
-    - Wiedemann Algorithm
     - portable
       - 21 bit accumulation for extension of degree 3
       - 16 bit accumulation
     - avx2
       - Montgomery reduction
     - avx512
-    - avx
-    - Secret Independent Rejection Sampling
+    - secret independent rejection sampling
     - aes256_ctr_drbg
+    - Krylov subspace methods
+    - Strassen algorithm
