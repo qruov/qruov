@@ -61,8 +61,14 @@ void MGF_final (MGF_CTX ctx) {
 // from openssl-1.1.1t/crypto/sha/keccak1600.c
 //      openssl-3.1.0/crypto/sha/keccak1600.c
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 extern size_t SHA3_absorb(uint64_t A[5][5], const unsigned char *inp, size_t len, size_t r);
 extern void SHA3_squeeze(uint64_t A[5][5], unsigned char *out, size_t len, size_t r);
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 // from openssl-1.1.1t/crypto/evp/m_sha3.c
 // omit 'PROV_SHA3_METHOD meth;' in openssl-3.1.0/include/internal/sha3.h 
@@ -193,7 +199,7 @@ static int EVP_DigestFinalXOF_BEGIN_legacy(EVP_MD_CTX * ctx, unsigned char * md)
     if (ctx->digest->flags & EVP_MD_FLAG_XOF
         && ctx->digest->md_ctrl(ctx, EVP_MD_CTRL_XOF_LEN, 1, NULL)) {
         ret = ctx->digest->final(ctx, md) ;
-        KECCAK1600_CTX * kctx = ctx->md_data;
+        KECCAK1600_CTX * kctx = (KECCAK1600_CTX *) ctx->md_data;
         size_t bsz = kctx->block_size;
         ctx->digest->md_ctrl(ctx, EVP_MD_CTRL_XOF_LEN, (int)bsz+1, NULL) ;
     } else {
@@ -208,7 +214,7 @@ int EVP_DigestFinalXOF_BEGIN(EVP_MD_CTX * ctx, unsigned char * md){
     return EVP_DigestFinalXOF_BEGIN_legacy(ctx, md) ;
 }
 
-#define ctx2kctx(ctx) (ctx->md_data)
+#define ctx2kctx(ctx) ((KECCAK1600_CTX *)ctx->md_data)
 
 #  else
 
@@ -239,7 +245,8 @@ int EVP_DigestFinalXOF_BEGIN(EVP_MD_CTX * ctx, unsigned char * md){
     if (EVP_MD_CTX_set_params(ctx, params) > 0)
         ret = ctx->digest->dfinal(ctx->algctx, md, &size, size) ;
 
-    KECCAK1600_CTX * kctx = ctx->algctx ;
+    KECCAK1600_CTX * kctx = (KECCAK1600_CTX *) ctx->algctx ;
+
     size_t bsz = kctx->block_size ;
 
     i = 0;
@@ -252,7 +259,7 @@ int EVP_DigestFinalXOF_BEGIN(EVP_MD_CTX * ctx, unsigned char * md){
 }
 
 #define ctx2kctx(ctx) \
-    ((ctx->digest->prov == NULL)?(ctx->md_data):(ctx->algctx))
+    ((ctx->digest->prov == NULL)?((KECCAK1600_CTX *)ctx->md_data):((KECCAK1600_CTX *)ctx->algctx))
 
 #  endif
 

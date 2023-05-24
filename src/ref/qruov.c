@@ -92,7 +92,7 @@ static void SAMPLE_P3(
   QRUOV_P3   P3   // output
 ){
   int i ;
-#pragma omp parallel for private(i) shared(SdT, P1, P2T, P3)
+#pragma omp parallel for private(i) shared(Sd, SdT, P1, P2, P2T, P3)
   for(i=0;i<m;i++){
     SAMPLE_Pi3(Sd, SdT, P1[i], P2[i], P2T[i], P3[i]) ;
   }
@@ -395,7 +395,7 @@ void QRUOV_Sign (
   Fql_srandom(vineger_seed, ctx) ;
   Fql_random_vector(ctx, V, vineger) ;
 
-#pragma omp parallel for private(i,j,k) shared(vineger, F2T, eqn, F1, msg)
+#pragma omp parallel for private(i,j,k) shared(vineger, F2T, eqn)
   for(i=0;i<m; i++){
     for(j=0; j<M; j++){
       Fql t = Fql_zero ;
@@ -411,7 +411,7 @@ void QRUOV_Sign (
 
   LU_decompose(eqn, echelon_form) ;
 
-#pragma omp parallel for private(i,j,k) shared(vineger, F2T, eqn, F1, msg)
+#pragma omp parallel for private(i,j,k) shared(vineger, F1, c)
   for(i=0;i<m; i++){
     Fql tmp [V] ;
 
@@ -492,7 +492,7 @@ int QRUOV_Verify(
   MATRIX_VxM * P2   = (MATRIX_VxM *) malloc(sizeof(QRUOV_P2)) ;
   MATRIX_MxV * P2T  = (MATRIX_MxV *) malloc(sizeof(QRUOV_P2T)) ;
 
-  if ( (P1==NULL) || (P2T==NULL) ) {
+  if ( (P1==NULL) || (P2==NULL) || (P2T==NULL) ) {
     ERROR_ABORT("malloc fail") ;
   }
 
@@ -542,7 +542,7 @@ int QRUOV_Verify(
       result[i] = 1 ;
     }
   }
-  free(P1) ; free(P2T) ;
+  free(P1) ; free(P2) ; free(P2T) ;
   for(i=0;i<m;i++){
     if(result[i] == 0) return 0 ;
   }

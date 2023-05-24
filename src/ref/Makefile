@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=@qruov_config.txt -O3 -fomit-frame-pointer -Wno-unused-result -I. -fopenmp # -DQRUOV_HASH_LEGACY -ggdb3 
+CFLAGS=@qruov_config.txt -DQRUOV_PLATFORM=ref -O3 -fomit-frame-pointer -Wno-unused-result -I. -fopenmp # -DQRUOV_HASH_LEGACY # -ggdb3 
 LDFLAGS=-lcrypto -Wl,-Bstatic -lcrypto -Wl,-Bdynamic -lm
 OBJS=Fql.o mgf.o PQCgenKAT_sign.o qruov.o rng.o sign.o matrix.o
 
