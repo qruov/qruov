@@ -1,6 +1,6 @@
 ### qruov
-- Wed May 17 12:41:14 JST 2023
-  - done
+- Mon May 29 16:33:28 JST 2023
+  - done:
     - sha2_evp
     - shake128/shake256 streaming input/output
       - openssl-1.1.1t
@@ -9,7 +9,7 @@
     - portable64
       - 21 bit accumulation for extension of degree 3
       - 16 bit accumulation
-  - todo
+  - todo:
     - avx2
       - Montgomery reduction
     - avx512

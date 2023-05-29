@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O3 -fomit-frame-pointer -Wno-unused-result -I. -fopenmp # -DQRUOV_HASH_LEGACY # -ggdb3 
+CFLAGS=-O3 -fomit-frame-pointer -Wno-unused-result -Wno-aggressive-loop-optimizations -I. -fopenmp # -DQRUOV_HASH_LEGACY # -ggdb3 
 LDFLAGS=-lcrypto -Wl,-Bstatic -lcrypto -Wl,-Bdynamic -lm
 OBJS=Fql.o mgf.o PQCgenKAT_sign.o qruov.o rng.o sign.o matrix.o
 
@@ -15,7 +15,7 @@ PQCgenKAT_sign: Makefile ${OBJS}
 	${CC} ${OBJS} ${CFLAGS} ${LDFLAGS} -o $@
 
 qruov_config.h: qruov_config_h_gen.c
-	${CC} @qruov_config.txt -DQRUOV_PLATFORM=ref -DQRUOV_CONFIG_H_GEN ${CFLAGS} ${LDFLAGS} qruov_config_h_gen.c
+	${CC} @qruov_config.txt -DQRUOV_PLATFORM=portable64 -DQRUOV_CONFIG_H_GEN ${CFLAGS} ${LDFLAGS} qruov_config_h_gen.c
 	./a.out > qruov_config.h
 	rm a.out
 

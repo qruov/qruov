@@ -7,8 +7,6 @@
 #include <stdlib.h>
 #include "qruov.h"
 
-Fql Fql_zero ;
-
 #if QRUOV_q == 7
   Fq Fq_inv_table[QRUOV_q] = {0,1,4,5,2,3,6} ;
 #elif QRUOV_q == 31
@@ -66,11 +64,29 @@ Fq Fq_random(Fql_RANDOM_CTX ctx){
   return r ;
 }
 
+#if QRUOV_L == 3
+
 Fql Fql_random(Fql_RANDOM_CTX ctx) {
-  Fql g ;
-  for(size_t i=0; i<QRUOV_L; i++) g.c[i] = Fq_random(ctx) ;
-  return g ;
+  Fq z0 = Fq_random(ctx) ;
+  Fq z1 = Fq_random(ctx) ;
+  Fq z2 = Fq_random(ctx) ;
+  return Fq2Fql(z0, z1, z2) ;
 }
+
+#elif QRUOV_L == 10
+
+Fql Fql_zero ;
+Fql_accumulator Fql_accumulator_zero ;
+
+Fql Fql_random(Fql_RANDOM_CTX ctx) {
+  uint16_t a[QRUOV_L] ;
+  for(int i=0; i<QRUOV_L; i++) a[i] = Fq_random(ctx) ;
+  return Fq2Fql(a) ;
+}
+
+#else
+#  error "unsupported QRUOV_L in Fql.c"
+#endif
 
 Fql * Fql_random_vector(Fql_RANDOM_CTX ctx, const size_t n0, Fql vec[]) {
   for(size_t i=0;i<n0;i++) vec[i] = Fql_random(ctx) ;

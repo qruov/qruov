@@ -342,9 +342,15 @@ static void sample_a_solution(
 
 static Fql * pack_0 (Fq oil_u[m], Fql oil[M]) {
   for(int i=0; i<M; i++){
-    for(int j=0; j<L; j++){
-      oil[i].c[j] = oil_u[i*L+j] ;
-    }
+#if QRUOV_L == 3
+    oil[i] = Fq2Fql(oil_u[i*L], oil_u[i*L+1], oil_u[i*L+2]) ;
+#elif QRUOV_L == 10
+    uint16_t a[QRUOV_L] ;
+    for(int j=0; j<QRUOV_L; j++) a[j] = oil_u[i*L+j] ;
+    oil[i] = Fq2Fql(a) ;
+#else
+  #error "unsupported QRUOV_L in pack_0()"
+#endif
   }
   return oil ;
 }
@@ -410,41 +416,9 @@ void QRUOV_Sign (
   Fql_srandom(vineger_seed, ctx) ;
   Fql_random_vector(ctx, V, vineger) ;
 
-#pragma omp parallel for private(i,j,k) shared(vineger, F2T, eqn)
-  for(i=0;i<m; i++){
-    for(j=0; j<M; j++){
-      Fql t = Fql_zero ;
-      for(k=0; k<V; k++){
-        t = Fql_add(t, Fql_mul(vineger[k],F2T[i][j][k])) ;
-      }
-      t = Fql_add(t,t) ;
-      for(int l=0; l<L; l++){
-        eqn[i][L*j+l] = t.c[QRUOV_perm(l)] ; // <- unpack_1(...) 
-      }
-    }
-  }
-
+  EQN_GEN(vineger, F2T, eqn) ;
   LU_decompose(eqn, echelon_form) ;
-
-#pragma omp parallel for private(i,j,k) shared(vineger, F1, c)
-  for(i=0;i<m; i++){
-    Fql tmp [V] ;
-
-    for(j=0; j<V; j++){
-      Fql t = Fql_zero ;
-      for(k=0; k<V; k++){
-        t = Fql_add(t, Fql_mul(vineger[k],F1[i][j][k])) ;
-      }
-      tmp[j] = t ;
-    }
-
-    int64_t c_i = 0 ;
-    for(k=0; k<V; k++){
-      c_i += (int64_t)(Fql_mul(tmp[k],vineger[k]).c[QRUOV_perm(0)]); // <-- shrink
-    }
-
-    c[i] = (Fq)(c_i % QRUOV_q) ;
-  }
+  C_GEN(vineger, F1, c) ;
 
   Fql_RANDOM_CTX msg_ctx   ; Fql_srandom_init(Msg, Msg_len, msg_ctx) ;
   Fql_RANDOM_CTX msg_ctx_2 ;
@@ -454,7 +428,7 @@ void QRUOV_Sign (
     Fql_RANDOM_CTX_copy(msg_ctx, msg_ctx_2) ;
     Fql_srandom_update(sig->r, QRUOV_SALT_LEN, msg_ctx_2) ;
     for(i=0; i<m; i++) msg[i] = Fq_random(msg_ctx_2) ;
-    for(i=0; i<m; i++) b[i] = Fq_sub(msg[i], c[i]) ;
+    for(i=0; i<m; i++) b[i]   = Fq_sub(msg[i], c[i]) ;
     Fq_random_final(msg_ctx_2) ;
   }while(!consistent(echelon_form, b, &cacheR, R)) ;
   MGF_final(r_ctx) ;
@@ -465,6 +439,9 @@ void QRUOV_Sign (
 
   pack_0(oil_u, oil) ;
 
+  SIG_GEN(oil, SdT, vineger, sig) ;
+
+/*
   for(i=0;i<V;i++){
     Fql t = Fql_zero ;
     for(j=0;j<M;j++){
@@ -475,6 +452,7 @@ void QRUOV_Sign (
   for(i=V;i<N;i++){
     sig->s[i] = oil[i-V] ;
   }
+*/
 
   OPENSSL_cleanse(Sd, sizeof(MATRIX_VxM)) ;
   OPENSSL_cleanse(SdT, sizeof(MATRIX_MxV)) ;
@@ -510,7 +488,6 @@ int QRUOV_Verify(
   if ( (P1==NULL) || (P2==NULL) || (P2T==NULL) ) {
     ERROR_ABORT("malloc fail") ;
   }
-
 
   const Fql * vineger = sig->s ;
   const Fql * oil     = sig->s + V ;
@@ -551,7 +528,7 @@ int QRUOV_Verify(
     for(j=0;j<M;j++){
       t = Fql_add(t, Fql_mul(oil[j],tmp_o[j])) ;
     }
-    if(msg[i] != t.c[QRUOV_perm(0)]){ // <-- shrink
+    if(msg[i] != Fql2Fq(t,QRUOV_perm(0))){ // <-- shrink
       result[i] = 0 ;
     }else{
       result[i] = 1 ;
