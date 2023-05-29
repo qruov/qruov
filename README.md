@@ -6,14 +6,14 @@
       - openssl-1.1.1t
       - openssl-3.1.0
     - sampling order of P1 and P2
-  - todo
-    - portable
+    - portable64
       - 21 bit accumulation for extension of degree 3
       - 16 bit accumulation
+  - todo
     - avx2
       - Montgomery reduction
     - avx512
     - secret independent rejection sampling
     - aes256_ctr_drbg
-    - Krylov subspace methods
     - Strassen algorithm
+    - Krylov subspace methods
