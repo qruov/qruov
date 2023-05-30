@@ -6,7 +6,7 @@
    F_q, F_q[X]/(f(X))
    ===================================================================== */
 
-typedef int8_t Fq ;
+typedef uint8_t Fq ;
 
 typedef struct Fql_t {
   Fq c[QRUOV_L] ;

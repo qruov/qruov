@@ -175,30 +175,30 @@ static void SAMPLE_F2T(
 // linear algebra
 // ==============================================
 
-TYPEDEF_STRUCT (RAW,
+TYPEDEF_STRUCT (ROW,
   Fq * col  ;
-  int  perm ;
+  int  original_row_id ;
 ) ;
 
 TYPEDEF_STRUCT (ECHELON_FORM,
-  RAW_s   row   [m] ;
-  RAW_s * eqn   [m] ;
+  ROW_s   row   [m] ;
+  ROW_s * eqn   [m] ;
   int rank          ;
   int index     [m] ;
 ) ;
 
 static void echelon_form_init(Fq mat[m][m], ECHELON_FORM echelon_form) {
   for(int i=0;i<m;i++){
-    echelon_form->row[i].col  = mat[i] ;
-    echelon_form->row[i].perm = i ;
-    echelon_form->eqn[i]      = echelon_form->row + i ;
+    echelon_form->row[i].col             = mat[i] ;
+    echelon_form->row[i].original_row_id = i ;
+    echelon_form->eqn[i]                 = echelon_form->row + i ;
   }
   echelon_form->rank = 0 ;
   memset(echelon_form->index,-1,sizeof(echelon_form->index));
 }
 
-static void row_swap(RAW_s * eqn[m], int i, int j) {
-  RAW_s * tmp  = eqn[i] ;
+static void row_swap(ROW_s * eqn[m], int i, int j) {
+  ROW_s * tmp  = eqn[i] ;
   eqn[i] = eqn[j] ;
   eqn[j] = tmp ;
 }
@@ -211,7 +211,7 @@ static void LU_decompose(
 ) {
   echelon_form_init(A, echelon_form) ;
   int i,j,k ;
-  RAW_s ** eqn = echelon_form->eqn ;
+  ROW_s ** eqn = echelon_form->eqn ;
 
   int c = -1 ;
   for(i=0; i<m; i++) {
@@ -253,7 +253,7 @@ static void Fq_mxm_identity(Fq A[m][m]){
 }
 
 static void L_inverse(ECHELON_FORM echelon_form, Fq R[m][m]){
-  RAW_s ** eqn  = echelon_form->eqn  ;
+  ROW_s ** eqn  = echelon_form->eqn  ;
   int      rank = echelon_form->rank ;
 
   Fq_mxm_identity(R) ;
@@ -276,7 +276,7 @@ static int consistent (
   int * cacheR,                // output
   Fq R[m][m]
 ) {
-  RAW_s ** eqn  = echelon_form->eqn  ;
+  ROW_s ** eqn  = echelon_form->eqn  ;
   int      rank = echelon_form->rank ;
   if(rank==m) return 1 ;
 
@@ -287,13 +287,13 @@ static int consistent (
 
   for(int i=rank; i<m; i++){
     int     k ;
-    int64_t t = 0 ;
+    uint64_t t = 0 ;
     for(int j=0; j<rank; j++){
-      k = eqn[j]->perm ;
-      t += ((int64_t)R[i][j]) * ((int64_t)b[k]) ;
+      k = eqn[j]->original_row_id ;
+      t += ((uint64_t)R[i][j]) * ((uint64_t)b[k]) ;
     }
-    k = eqn[i]->perm ;
-    t += ((int64_t)R[i][i]) * ((int64_t)b[k]) ;
+    k = eqn[i]->original_row_id ;
+    t += ((uint64_t)R[i][i]) * ((uint64_t)b[k]) ;
     t %= QRUOV_q ;
     if(t) return 0 ;
   }
@@ -310,16 +310,16 @@ static void sample_a_solution(
 ) {
   int      rank  = echelon_form->rank ;
   int   *  index = echelon_form->index ;
-  RAW_s ** eqn   = echelon_form->eqn  ;
+  ROW_s ** eqn   = echelon_form->eqn  ;
   int i,j,k,o ;
 
   for(i=0; i<rank; i++){
-    int64_t t = 0 ;
+    uint64_t t = 0 ;
     for(j=0;j<i;j++){
-      t += ((int64_t)EQN(i,j)) * ((int64_t)b2[j]) ;
+      t += ((uint64_t)EQN(i,j)) * ((uint64_t)b2[j]) ;
     }
     Fq tmp = (Fq)(t % QRUOV_q) ;
-    k = eqn[i]->perm ;
+    k = eqn[i]->original_row_id ;
     tmp = Fq_sub(b[k],tmp) ;
     b2[i] = Fq_mul(tmp,Fq_inv(EQN(i,i))) ;
   }
@@ -329,9 +329,9 @@ static void sample_a_solution(
     k = index[j] ;
     for( ; i > k; i--) x[i] = Fq_random(ctx) ;
     // i == k
-    int64_t t = 0 ;
+    uint64_t t = 0 ;
     for(k++; k < m; k++){
-      t += ((int64_t)EQN(j,k)) * ((int64_t)(x[k])) ;
+      t += ((uint64_t)EQN(j,k)) * ((uint64_t)(x[k])) ;
     }
     x[i] = Fq_sub(b2[j], (Fq)(t % QRUOV_q) ) ;
     i-- ;
@@ -441,19 +441,6 @@ void QRUOV_Sign (
 
   SIG_GEN(oil, SdT, vineger, sig) ;
 
-/*
-  for(i=0;i<V;i++){
-    Fql t = Fql_zero ;
-    for(j=0;j<M;j++){
-      t = Fql_add(t, Fql_mul(oil[j],SdT[j][i])) ;
-    }
-    sig->s[i] = Fql_sub(vineger[i], t) ;
-  }
-  for(i=V;i<N;i++){
-    sig->s[i] = oil[i-V] ;
-  }
-*/
-
   OPENSSL_cleanse(Sd, sizeof(MATRIX_VxM)) ;
   OPENSSL_cleanse(SdT, sizeof(MATRIX_MxV)) ;
   free(Sd); free(SdT); free(P1); free(P2); free(P2T); free(F2T); free(eqn); free(R);
@@ -485,9 +472,7 @@ int QRUOV_Verify(
   MATRIX_VxM * P2   = (MATRIX_VxM *) malloc(sizeof(QRUOV_P2)) ;
   MATRIX_MxV * P2T  = (MATRIX_MxV *) malloc(sizeof(QRUOV_P2T)) ;
 
-  if ( (P1==NULL) || (P2==NULL) || (P2T==NULL) ) {
-    ERROR_ABORT("malloc fail") ;
-  }
+  if ((P1==NULL)||(P2==NULL)||(P2T==NULL)) ERROR_ABORT("malloc fail") ;
 
   const Fql * vineger = sig->s ;
   const Fql * oil     = sig->s + V ;
@@ -496,44 +481,10 @@ int QRUOV_Verify(
 
   SAMPLE_P1P2(pk_seed, P1, P2, P2T) ;
 
-  int result [m] ;
-#pragma omp parallel for private(i,j,k,t) shared(P1, P2T, P3, oil, vineger, msg, result)
-  for(i=0; i<m; i++){
-    Fql tmp_v [V] ;
-    Fql tmp_o [M] ;
-    for(j=0;j<V;j++){
-      t = Fql_zero ;
-      for(k=0;k<M;k++){
-        t = Fql_add(t, Fql_mul(P2T[i][k][j],oil[k])) ; // <-
-      }
-      t = Fql_add(t,t) ;
-      for(k=0;k<V;k++){
-        t = Fql_add(t, Fql_mul(P1[i][j][k],vineger[k])) ;
-      }
-      tmp_v[j] = t ;
-    }
+  uint8_t result [QRUOV_m] ;
 
-    for(j=0;j<M;j++){
-      t = Fql_zero ;
-      for(k=0;k<M;k++){
-        t = Fql_add(t, Fql_mul(P3[i][j][k],oil[k])) ;
-      }
-      tmp_o[j] = t ;
-    }
+  RESULT_GEN(P1, P2T, P3, oil, vineger, msg, result) ;
 
-    t = Fql_zero ;
-    for(j=0;j<V;j++){
-      t = Fql_add(t, Fql_mul(vineger[j],tmp_v[j])) ;
-    }
-    for(j=0;j<M;j++){
-      t = Fql_add(t, Fql_mul(oil[j],tmp_o[j])) ;
-    }
-    if(msg[i] != Fql2Fq(t,QRUOV_perm(0))){ // <-- shrink
-      result[i] = 0 ;
-    }else{
-      result[i] = 1 ;
-    }
-  }
   free(P1) ; free(P2) ; free(P2T) ;
   for(i=0;i<m;i++){
     if(result[i] == 0) return 0 ;

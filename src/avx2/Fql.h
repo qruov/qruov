@@ -3,6 +3,7 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 #include <inttypes.h>
+// #include <x86intrin.h>
 
 #include "qruov_misc.h"
 #include "mgf.h"

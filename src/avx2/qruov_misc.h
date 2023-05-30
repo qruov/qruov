@@ -1,4 +1,6 @@
 #pragma once
+#include <immintrin.h>
+#include <x86intrin.h>
 #include "qruov_config.h"
 
 /*
@@ -10,7 +12,7 @@
   QRUOV_fc                         // fc
   QRUOV_fe                         // fe
   QRUOV_fc0                        // fc0
-  QRUOV_PLATFORM                   // ref/portable64/avx2/avx512
+  QRUOV_PLATFORM                   // ref/portable/avx2/avx512
 */
 
 #ifndef QRUOV_security_strength_category
@@ -113,3 +115,12 @@ typedef struct TYPE_NAME ## _t {                    \
   fprintf(stderr, "runtime error: %s in file: %s, line: %d.\n",MESSAGE,__FILE__,__LINE__); \
   abort(); \
 }
+
+typedef          __int128  INT128_T ;
+typedef unsigned __int128 UINT128_T ;
+
+// assume sizeof(Fq) == 1
+#define NUM_m128i   ((QRUOV_m / sizeof(__m128i))+((QRUOV_m % sizeof(__m128i))?1:0))
+#define aligned_m   (NUM_m128i*sizeof(__m128i))
+#define QRUOV_aligned __attribute__((aligned(sizeof(__m128i))))
+

@@ -153,7 +153,7 @@ void MATRIX_TRANSPOSE_VxM(MATRIX_VxM A, MATRIX_MxV C){
   MATRIX_TRANSPOSE(Fql, QRUOV_V, QRUOV_M, A, C) ;
 }
 
-void EQN_GEN(VECTOR_V vineger, MATRIX_MxV F2T[QRUOV_m], Fq eqn[QRUOV_m][QRUOV_m]){
+void EQN_GEN(VECTOR_V vineger, MATRIX_MxV F2T[QRUOV_m], Fq eqn[QRUOV_m][aligned_m]){
   int i,j,k ;
 #pragma omp parallel for private(i,j,k) shared(vineger, F2T, eqn)
   for(i=0; i<QRUOV_m; i++){
@@ -173,7 +173,7 @@ void EQN_GEN(VECTOR_V vineger, MATRIX_MxV F2T[QRUOV_m], Fq eqn[QRUOV_m][QRUOV_m]
   }
 }
 
-void C_GEN(VECTOR_V vineger, MATRIX_VxV F1[QRUOV_m], Fq c[QRUOV_m]){
+void C_GEN(VECTOR_V vineger, MATRIX_VxV F1[QRUOV_m], Fq c[aligned_m]){
   int i,j,k ;
 #pragma omp parallel for private(i,j,k) shared(vineger, F1, c)
   for(i=0; i<QRUOV_m; i++){
@@ -212,7 +212,7 @@ void SIG_GEN(VECTOR_M oil, MATRIX_MxV SdT, VECTOR_V vineger, QRUOV_SIGNATURE sig
   }
 }
 
-void RESULT_GEN(const QRUOV_P1 P1, const QRUOV_P2T P2T, const QRUOV_P3 P3, const VECTOR_M oil, const VECTOR_V vineger, const Fq msg [QRUOV_m], uint8_t result[QRUOV_m]) {
+void RESULT_GEN(const QRUOV_P1 P1, const QRUOV_P2T P2T, const QRUOV_P3 P3, const VECTOR_M oil, const VECTOR_V vineger, const Fq msg [aligned_m], uint8_t result[QRUOV_m]) {
   int i,j,k ;
 #pragma omp parallel for private(i,j,k) shared(P1, P2T, P3, oil, vineger, msg, result)
   for(i=0; i<QRUOV_m; i++){
