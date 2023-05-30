@@ -1,5 +1,5 @@
 ### qruov
-- Tue May 30 18:35:13 JST 2023
+- Wed May 31 03:08:39 JST 2023
   - done:
     - sha2_evp
     - shake128/shake256 streaming input/output
@@ -9,13 +9,16 @@
     - portable64
       - 21 bit accumulation for extension of degree 3
       - 16 bit accumulation
+  - working:
     - avx2
       - not so optimized
-  - todo:
     - avx512
+      - not so optimized
+  - todo:
     - secret independent rejection sampling
-    - aes256_ctr_drbg
+    - secret independent linear equation solver
     - pending
+      - aes256_ctr_drbg
       - strassen algorithm
       - krylov subspace methods
       - montgomery reduction
