@@ -1,5 +1,9 @@
 #pragma once
-#include <string.h>
+
+#include <openssl/sha.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
+
 #include "qruov_misc.h"
 
 /* =====================================================================

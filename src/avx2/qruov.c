@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "qruov.h"
-#include "Fq_avx2.h"
+#include <string.h>
 
 /* ---------------------------------------------------------
    local definition
@@ -114,18 +114,25 @@ static void SAMPLE_P3(
   }
 }
 
+
+inline static void * aligned_calloc(size_t alignment, size_t size){
+  void * p = aligned_alloc(alignment, size) ;
+  if(p) memset(p,0,size) ;
+  return p ;
+}
+
 void QRUOV_KeyGen (
   const QRUOV_SEED sk_seed, // input
   const QRUOV_SEED pk_seed, // input
   QRUOV_P3         P3       // output
 ){
   // Huge array
-  VECTOR_M   * Sd   = (VECTOR_M *)   malloc(sizeof(MATRIX_VxM)) ;
-  VECTOR_V   * SdT  = (VECTOR_V *)   malloc(sizeof(MATRIX_MxV)) ;
+  VECTOR_M   * Sd   = (VECTOR_M *)   aligned_calloc(sizeof(__m256i), sizeof(MATRIX_VxM)) ;
+  VECTOR_V   * SdT  = (VECTOR_V *)   aligned_calloc(sizeof(__m256i), sizeof(MATRIX_MxV)) ;
 
-  MATRIX_VxV * P1   = (MATRIX_VxV *) malloc(sizeof(QRUOV_P1)) ;
-  MATRIX_VxM * P2   = (MATRIX_VxM *) malloc(sizeof(QRUOV_P2)) ;
-  MATRIX_MxV * P2T  = (MATRIX_MxV *) malloc(sizeof(QRUOV_P2T)) ;
+  MATRIX_VxV * P1   = (MATRIX_VxV *) aligned_calloc(sizeof(__m256i),sizeof(QRUOV_P1)) ;
+  MATRIX_VxM * P2   = (MATRIX_VxM *) aligned_calloc(sizeof(__m256i),sizeof(QRUOV_P2)) ;
+  MATRIX_MxV * P2T  = (MATRIX_MxV *) aligned_calloc(sizeof(__m256i),sizeof(QRUOV_P2T)) ;
 
   if ( (Sd==NULL) || (SdT==NULL) || (P1==NULL) || (P2==NULL) || (P2T==NULL) ) {
     ERROR_ABORT("malloc fail") ;
@@ -184,11 +191,11 @@ TYPEDEF_STRUCT (ROW,
 TYPEDEF_STRUCT (ECHELON_FORM,
   ROW_s   row   [m] ;
   ROW_s * eqn   [m] ;
-  int rank                  ;
+  int rank          ;
   int index     [m] ;
 ) ;
 
-static void echelon_form_init(Fq mat[m][aligned_m], ECHELON_FORM echelon_form) {
+static void echelon_form_init(Fq mat[m][m], ECHELON_FORM echelon_form) {
   for(int i=0;i<m;i++){
     echelon_form->row[i].col             = mat[i] ;
     echelon_form->row[i].original_row_id = i ;
@@ -207,7 +214,7 @@ static void row_swap(ROW_s * eqn[m], int i, int j) {
 #define EQN(I,J) (eqn[I]->col[J])
 
 static void LU_decompose(
-  Fq A[QRUOV_m][aligned_m],                    // input (will be destroyed)
+  Fq A[m][m],                    // input (will be destroyed)
   ECHELON_FORM echelon_form      // output
 ) {
   echelon_form_init(A, echelon_form) ;
@@ -233,72 +240,27 @@ static void LU_decompose(
     Fq inv   = Fq_inv(pivot) ;
 
     EQN(i,i)  = pivot ;
-
-#if 0
-    for(k = c+1; k < m; k++) EQN(i,k) = Fq_mul(inv, EQN(i,k)) ;        // <-----
-#else
-
-    __m128i zero128 = _mm_setzero_si128() ;
-    __m128i inv128  = _mm_insert_epi16(zero128,(uint16_t)inv,0) ;
-    __m256i inv256  = _mm256_broadcastw_epi16(inv128) ;
-
-    int kk = (((c+1)/sizeof(__m128i))+(((c+1)%sizeof(__m128i))?1:0)) * sizeof(__m128i) ;
-    for(k = c+1; k < kk; k++) EQN(i,k) = Fq_mul(inv, EQN(i,k)) ;
-    for(       ; k < m ; k += sizeof(__m128i)){
-      __m128i e128 = _mm_load_si128((__m128i*)&EQN(i,k)) ;
-      __m256i e256 = _mm256_cvtepu8_epi16(e128) ;
-      __m256i r256 = _m256i_Fq_mul(inv256,e256) ;
-//                   _mm256_mask_cvtusepi16_storeu_epi8((__m128i*)&EQN(i,k), 0xFFFF, r256) ; // -mavx512f -mavx512bw -mavx512vl
-      __m128i l128 = _mm256_castsi256_si128(r256) ;
-      __m128i h128 = _mm256_extracti128_si256(r256, 1) ;
-      __m128i r128 = _mm_packus_epi16(l128,h128) ;
-                     _mm_store_si128((__m128i*)&EQN(i,k),r128) ;
-    }
-#endif
+    for(k = c+1; k<m; k++) EQN(i,k) = Fq_mul(inv, EQN(i,k)) ;
 
     for(j=i+1; j<m; j++) {
       Fq mul = EQN(j,c) ;
       EQN(j,i) = mul ;
 
-#if 0
-      for(k = c+1; k < m; k++){                                        // <-----
+      for(k = c+1; k<m; k++){
         EQN(j,k) = Fq_sub(EQN(j,k), Fq_mul(mul, EQN(i,k))) ;
       }
-#else
-      __m128i zero128 = _mm_setzero_si128() ;
-      __m128i mul128  = _mm_insert_epi16(zero128,(uint16_t)mul,0) ;
-      __m256i mul256  = _mm256_broadcastw_epi16(mul128) ;
-
-      for(k = c+1; k < kk; k++){
-        EQN(j,k) = Fq_sub(EQN(j,k), Fq_mul(mul, EQN(i,k))) ;
-      }
-
-      for(       ; k < m ; k += sizeof(__m128i)){
-        __m128i e128 = _mm_load_si128((__m128i*)&EQN(i,k)) ;
-        __m256i e256 = _mm256_cvtepu8_epi16(e128) ;
-        __m256i r256 = _m256i_Fq_mul(mul256,e256) ;
-        __m128i s128 = _mm_load_si128((__m128i*)&EQN(j,k)) ;
-        __m256i s256 = _mm256_cvtepu8_epi16(s128) ;
-        __m256i t256 = _m256i_Fq_sub(s256,r256) ;
-        __m128i l128 = _mm256_castsi256_si128(t256) ;
-        __m128i h128 = _mm256_extracti128_si256(t256, 1) ;
-        __m128i u128 = _mm_packus_epi16(l128,h128) ;
-                       _mm_store_si128((__m128i*)&EQN(j,k),u128) ;
-      }
-
-#endif
     }
   }
 
   return ;
 }
 
-static void Fq_mxm_identity(Fq A[m][aligned_m]){
-  memset(A,0,sizeof(Fq)*m*aligned_m) ;
+static void Fq_mxm_identity(Fq A[m][m]){
+  memset(A,0,sizeof(Fq)*m*m) ;
   for(int i=0;i<m;i++) A[i][i] = 1 ;
 }
 
-static void L_inverse(ECHELON_FORM echelon_form, Fq R[m][aligned_m]){
+static void L_inverse(ECHELON_FORM echelon_form, Fq R[m][m]){
   ROW_s ** eqn  = echelon_form->eqn  ;
   int      rank = echelon_form->rank ;
 
@@ -318,9 +280,9 @@ static void L_inverse(ECHELON_FORM echelon_form, Fq R[m][aligned_m]){
 
 static int consistent (
   ECHELON_FORM echelon_form,   // input
-  Fq b[aligned_m],
+  Fq b[m],
   int * cacheR,                // output
-  Fq R[m][aligned_m]
+  Fq R[m][m]
 ) {
   ROW_s ** eqn  = echelon_form->eqn  ;
   int      rank = echelon_form->rank ;
@@ -350,9 +312,9 @@ static int consistent (
 static void sample_a_solution(
   Fql_RANDOM_CTX ctx,                // input
   ECHELON_FORM   echelon_form,       // input
-  Fq             b    [aligned_m],   // input
-  Fq             x    [aligned_m],   // output
-  Fq             b2   [aligned_m]    // output
+  Fq             b    [m],           // input
+  Fq             x    [m],           // output
+  Fq             b2   [m]            // output
 ) {
   int      rank  = echelon_form->rank ;
   int   *  index = echelon_form->index ;
@@ -386,17 +348,11 @@ static void sample_a_solution(
   return ;
 }
 
-static Fql * pack_0 (Fq oil_u[aligned_m], Fql oil[M]) {
+static Fql * pack_0 (Fq oil_u[m], Fql oil[M]) {
   for(int i=0; i<M; i++){
-#if QRUOV_L == 3
-    oil[i] = Fq2Fql(oil_u[i*L], oil_u[i*L+1], oil_u[i*L+2]) ;
-#elif QRUOV_L == 10
-    uint16_t a[QRUOV_L] ;
-    for(int j=0; j<QRUOV_L; j++) a[j] = oil_u[i*L+j] ;
-    oil[i] = Fq2Fql(a) ;
-#else
-  #error "unsupported QRUOV_L in pack_0()"
-#endif
+    for(int j=0; j<L; j++){
+      oil[i].c[j] = oil_u[i*L+j] ;
+    }
   }
   return oil ;
 }
@@ -421,27 +377,28 @@ void QRUOV_Sign (
   Fql vineger [V] ;
   Fql oil     [M] ; //
 
-  Fq  oil_u   [aligned_m] QRUOV_aligned ; // unpacked oil.
-  Fq  b       [aligned_m] QRUOV_aligned ; //
-  Fq  b2      [aligned_m] QRUOV_aligned ; //
-  Fq  c       [aligned_m] QRUOV_aligned ; //
+  Fq  oil_u   [m] ; // unpacked oil.
+  Fq  b       [m] ; //
+  Fq  b2      [m] ; //
+  Fq  c       [m] ; //
 
   /* ----------------------------------
      Huge array -> malloc
      ---------------------------------- */
 
-  VECTOR_M   * Sd   = (VECTOR_M   *) malloc(sizeof(MATRIX_VxM)) ;
-  VECTOR_V   * SdT  = (VECTOR_V   *) malloc(sizeof(MATRIX_MxV)) ;
+  VECTOR_M   * Sd   = (VECTOR_M   *)  aligned_calloc(sizeof(__m256i), sizeof(MATRIX_VxM)) ;
+  VECTOR_V   * SdT  = (VECTOR_V   *)  aligned_calloc(sizeof(__m256i), sizeof(MATRIX_MxV)) ;
 
-  MATRIX_VxV * P1   = (MATRIX_VxV *) malloc(sizeof(QRUOV_P1)) ;
-  MATRIX_VxM * P2   = (MATRIX_VxM *) malloc(sizeof(QRUOV_P2)) ;
+  MATRIX_VxV * P1   = (MATRIX_VxV *)  aligned_calloc(sizeof(__m256i), sizeof(QRUOV_P1)) ;
+  MATRIX_VxM * P2   = (MATRIX_VxM *)  aligned_calloc(sizeof(__m256i), sizeof(QRUOV_P2)) ;
 
-  MATRIX_MxV * P2T  = (MATRIX_MxV *) malloc(sizeof(QRUOV_P2T)) ;
+  MATRIX_MxV * P2T  = (MATRIX_MxV *)  aligned_calloc(sizeof(__m256i), sizeof(QRUOV_P2T)) ;
   MATRIX_VxV * F1   = P1 ;
-  MATRIX_MxV * F2T  = (MATRIX_MxV *) malloc(sizeof(QRUOV_P2T)) ;
+  MATRIX_MxV * F2T  = (MATRIX_MxV *)  aligned_calloc(sizeof(__m256i), sizeof(QRUOV_P2T)) ;
 
-  Fq (* eqn)[aligned_m] = (Fq(*)[aligned_m]) aligned_alloc(sizeof(__m128i),sizeof(Fq)*m*aligned_m) ;
-  Fq (* R  )[aligned_m] = (Fq(*)[aligned_m]) aligned_alloc(sizeof(__m128i),sizeof(Fq)*m*aligned_m) ;
+  Fq (* eqn)[m]     = (Fq(*)[m])      aligned_calloc(sizeof(__m256i), sizeof(Fq)*m*(m)) ;
+
+  Fq (* R)[m]       = (Fq(*)[m])      aligned_calloc(sizeof(__m256i), sizeof(Fq)*m*m) ;
   int cacheR        = 0 ;
 
   if ( (Sd==NULL)|| (SdT==NULL)||(P1==NULL)|| (P2==NULL)|| (P2T==NULL)||(F2T==NULL)|| (eqn==NULL)||(R==NULL) ){
@@ -452,7 +409,7 @@ void QRUOV_Sign (
      
      ---------------------------------- */
 
-  Fq msg [aligned_m] QRUOV_aligned ;
+  Fq msg [QRUOV_m] ;
 
   SAMPLE_Sd(sk_seed, Sd, SdT) ;
   SAMPLE_P1P2(pk_seed, P1, P2, P2T) ;
@@ -461,9 +418,41 @@ void QRUOV_Sign (
   Fql_srandom(vineger_seed, ctx) ;
   Fql_random_vector(ctx, V, vineger) ;
 
-  EQN_GEN(vineger, F2T, eqn) ;
+#pragma omp parallel for private(i,j,k) shared(vineger, F2T, eqn)
+  for(i=0;i<m; i++){
+    for(j=0; j<M; j++){
+      Fql t = Fql_zero ;
+      for(k=0; k<V; k++){
+        t = Fql_add(t, Fql_mul(vineger[k],F2T[i][j][k])) ;
+      }
+      t = Fql_add(t,t) ;
+      for(int l=0; l<L; l++){
+        eqn[i][L*j+l] = t.c[QRUOV_perm(l)] ; // <- unpack_1(...) 
+      }
+    }
+  }
+
   LU_decompose(eqn, echelon_form) ;
-  C_GEN(vineger, F1, c) ;
+
+#pragma omp parallel for private(i,j,k) shared(vineger, F1, c)
+  for(i=0;i<m; i++){
+    Fql tmp [V] ;
+
+    for(j=0; j<V; j++){
+      Fql t = Fql_zero ;
+      for(k=0; k<V; k++){
+        t = Fql_add(t, Fql_mul(vineger[k],F1[i][j][k])) ;
+      }
+      tmp[j] = t ;
+    }
+
+    uint64_t c_i = 0 ;
+    for(k=0; k<V; k++){
+      c_i += (uint64_t)(Fql_mul(tmp[k],vineger[k]).c[QRUOV_perm(0)]); // <-- shrink
+    }
+
+    c[i] = (Fq)(c_i % QRUOV_q) ;
+  }
 
   Fql_RANDOM_CTX msg_ctx   ; Fql_srandom_init(Msg, Msg_len, msg_ctx) ;
   Fql_RANDOM_CTX msg_ctx_2 ;
@@ -473,7 +462,7 @@ void QRUOV_Sign (
     Fql_RANDOM_CTX_copy(msg_ctx, msg_ctx_2) ;
     Fql_srandom_update(sig->r, QRUOV_SALT_LEN, msg_ctx_2) ;
     for(i=0; i<m; i++) msg[i] = Fq_random(msg_ctx_2) ;
-    for(i=0; i<m; i++) b[i]   = Fq_sub(msg[i], c[i]) ;
+    for(i=0; i<m; i++) b[i] = Fq_sub(msg[i], c[i]) ;
     Fq_random_final(msg_ctx_2) ;
   }while(!consistent(echelon_form, b, &cacheR, R)) ;
   MGF_final(r_ctx) ;
@@ -484,7 +473,16 @@ void QRUOV_Sign (
 
   pack_0(oil_u, oil) ;
 
-  SIG_GEN(oil, SdT, vineger, sig) ;
+  for(i=0;i<V;i++){
+    Fql t = Fql_zero ;
+    for(j=0;j<M;j++){
+      t = Fql_add(t, Fql_mul(oil[j],SdT[j][i])) ;
+    }
+    sig->s[i] = Fql_sub(vineger[i], t) ;
+  }
+  for(i=V;i<N;i++){
+    sig->s[i] = oil[i-V] ;
+  }
 
   OPENSSL_cleanse(Sd, sizeof(MATRIX_VxM)) ;
   OPENSSL_cleanse(SdT, sizeof(MATRIX_MxV)) ;
@@ -509,15 +507,18 @@ int QRUOV_Verify(
   Fql_srandom_init(Msg, Msg_len, msg_ctx) ;
   Fql_srandom_update(sig->r, QRUOV_SALT_LEN, msg_ctx) ;
 
-  Fq msg [aligned_m] QRUOV_aligned ;
+  Fq msg [QRUOV_m] ;
 
   for(int i=0; i<m; i++) msg[i] = Fq_random(msg_ctx) ;
 
-  MATRIX_VxV * P1   = (MATRIX_VxV *) malloc(sizeof(QRUOV_P1)) ;
-  MATRIX_VxM * P2   = (MATRIX_VxM *) malloc(sizeof(QRUOV_P2)) ;
-  MATRIX_MxV * P2T  = (MATRIX_MxV *) malloc(sizeof(QRUOV_P2T)) ;
+  MATRIX_VxV * P1   = (MATRIX_VxV *)  aligned_calloc(sizeof(__m256i), sizeof(QRUOV_P1)) ;
+  MATRIX_VxM * P2   = (MATRIX_VxM *)  aligned_calloc(sizeof(__m256i), sizeof(QRUOV_P2)) ;
+  MATRIX_MxV * P2T  = (MATRIX_MxV *)  aligned_calloc(sizeof(__m256i), sizeof(QRUOV_P2T)) ;
 
-  if ((P1==NULL)||(P2==NULL)||(P2T==NULL)) ERROR_ABORT("malloc fail") ;
+  if ( (P1==NULL) || (P2==NULL) || (P2T==NULL) ) {
+    ERROR_ABORT("malloc fail") ;
+  }
+
 
   const Fql * vineger = sig->s ;
   const Fql * oil     = sig->s + V ;
@@ -526,10 +527,44 @@ int QRUOV_Verify(
 
   SAMPLE_P1P2(pk_seed, P1, P2, P2T) ;
 
-  uint8_t result [aligned_m] QRUOV_aligned ;
+  int result [m] ;
+#pragma omp parallel for private(i,j,k,t) shared(P1, P2T, P3, oil, vineger, msg, result)
+  for(i=0; i<m; i++){
+    Fql tmp_v [V] ;
+    Fql tmp_o [M] ;
+    for(j=0;j<V;j++){
+      t = Fql_zero ;
+      for(k=0;k<M;k++){
+        t = Fql_add(t, Fql_mul(P2T[i][k][j],oil[k])) ; // <-
+      }
+      t = Fql_add(t,t) ;
+      for(k=0;k<V;k++){
+        t = Fql_add(t, Fql_mul(P1[i][j][k],vineger[k])) ;
+      }
+      tmp_v[j] = t ;
+    }
 
-  RESULT_GEN(P1, P2T, P3, oil, vineger, msg, result) ;
+    for(j=0;j<M;j++){
+      t = Fql_zero ;
+      for(k=0;k<M;k++){
+        t = Fql_add(t, Fql_mul(P3[i][j][k],oil[k])) ;
+      }
+      tmp_o[j] = t ;
+    }
 
+    t = Fql_zero ;
+    for(j=0;j<V;j++){
+      t = Fql_add(t, Fql_mul(vineger[j],tmp_v[j])) ;
+    }
+    for(j=0;j<M;j++){
+      t = Fql_add(t, Fql_mul(oil[j],tmp_o[j])) ;
+    }
+    if(msg[i] != t.c[QRUOV_perm(0)]){ // <-- shrink
+      result[i] = 0 ;
+    }else{
+      result[i] = 1 ;
+    }
+  }
   free(P1) ; free(P2) ; free(P2T) ;
   for(i=0;i<m;i++){
     if(result[i] == 0) return 0 ;

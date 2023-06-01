@@ -15,8 +15,9 @@
     - avx512
       - not so optimized
   - todo:
-    - secret independent rejection sampling
-    - secret independent linear equation solver
+    - secret independent
+      - rejection sampling
+      - linear equation solver
     - pending
       - aes256_ctr_drbg
       - strassen algorithm

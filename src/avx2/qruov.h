@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <inttypes.h>
+#include <x86intrin.h>
+
 #include "qruov_misc.h"
 #include "mgf.h"
 #include "Fql.h"
@@ -17,7 +20,6 @@
    QRUOV functions
    ===================================================================== */
 
-/*
 typedef MATRIX_VxM QRUOV_Sd                         ;
 typedef MATRIX_MxV QRUOV_SdT                        ;
 typedef MATRIX_VxV QRUOV_P1        [QRUOV_m]        ;
@@ -29,7 +31,6 @@ TYPEDEF_STRUCT(QRUOV_SIGNATURE,
   QRUOV_SALT r           ;
   Fql        s [QRUOV_N] ;
 ) ;
-*/
 
 //
 // SECRET       KEY : (sk_seed,        ,   )
@@ -146,57 +147,22 @@ inline static void restore_Fq_vector(
   for(size_t i=0; i<n; i++) Z[i] = restore_Fq(pool, pool_bits) ;
 }
 
-#if QRUOV_L == 3
-
 inline static void store_Fql(
-  Fql       X,
+  const Fql       X,
   uint8_t       * pool,            // bit pool
   size_t        * pool_bits        // current bit index
 ){
-  Fq x0 = (Fq)X & QRUOV_q ; X >>= 22 ;
-  Fq x1 = (Fq)X & QRUOV_q ; X >>= 22 ;
-  Fq x2 = (Fq)X & QRUOV_q ;
-  store_Fq(x0, pool, pool_bits) ;
-  store_Fq(x1, pool, pool_bits) ;
-  store_Fq(x2, pool, pool_bits) ;
+  store_Fq_vector(X.c, QRUOV_L, pool, pool_bits) ;
 }
 
 inline static Fql restore_Fql(
   const uint8_t * pool,            // bit pool
   size_t        * pool_bits        // current bit index
 ){
-  Fql a0 = restore_Fq(pool, pool_bits) ;
-  Fql a1 = restore_Fq(pool, pool_bits) ; a1 <<= 22 ;
-  Fql a2 = restore_Fq(pool, pool_bits) ; a2 <<= 44 ;
-  return a0|a1|a2 ;
+  Fql Z ;
+  restore_Fq_vector(pool, pool_bits, Z.c, QRUOV_L) ;
+  return Z ;
 }
-
-#elif QRUOV_L == 10
-
-inline static void store_Fql(
-  Fql       X,
-  uint8_t       * pool,            // bit pool
-  size_t        * pool_bits        // current bit index
-){
-  for(int i=0; i<QRUOV_L; i++){
-    Fq x = Fql2Fq(X,i) ;
-    store_Fq(x, pool, pool_bits) ;
-  }
-}
-
-inline static Fql restore_Fql(
-  const uint8_t * pool,            // bit pool
-  size_t        * pool_bits        // current bit index
-){
-  uint16_t a[QRUOV_L] ;
-  for(int i=0; i<QRUOV_L; i++){
-    a[i] = restore_Fq(pool, pool_bits) ;
-  }
-  return Fq2Fql(a) ;
-}
-#else
-#  error "unsupported QRUOV_L in qruov.h: store_Fql(), restore_Fql()"
-#endif
 
 inline static void store_Fql_vector(
   const Fql    * X,

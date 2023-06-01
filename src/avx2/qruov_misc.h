@@ -1,7 +1,8 @@
 #pragma once
-#include <immintrin.h>
-#include <x86intrin.h>
 #include "qruov_config.h"
+
+#include <inttypes.h>
+#include <x86intrin.h>
 
 /*
   QRUOV_security_strength_category // 1/3/5
@@ -12,7 +13,7 @@
   QRUOV_fc                         // fc
   QRUOV_fe                         // fe
   QRUOV_fc0                        // fc0
-  QRUOV_PLATFORM                   // ref/portable/avx2/avx512
+  QRUOV_PLATFORM                   // ref/portable64/avx2/avx512
 */
 
 #ifndef QRUOV_security_strength_category
@@ -116,11 +117,13 @@ typedef struct TYPE_NAME ## _t {                    \
   abort(); \
 }
 
-typedef          __int128  INT128_T ;
-typedef unsigned __int128 UINT128_T ;
+#define num_bytes(n,type)                   (n * sizeof(type))
+#define upper_num_elements(bytes,type)      ((bytes/sizeof(type)) + ((bytes % sizeof(type))?1:0))
+#define upper_num_bytes(bytes,type)         (upper_num_elements(bytes,type)*sizeof(type))
+#define aligned_number(n, src_t, dst_t)     (upper_num_elements(upper_num_bytes(num_bytes(n,src_t),dst_t),src_t))
 
-// assume sizeof(Fq) == 1
-#define NUM_m128i   ((QRUOV_m / sizeof(__m128i))+((QRUOV_m % sizeof(__m128i))?1:0))
-#define aligned_m   (NUM_m128i*sizeof(__m128i))
-#define QRUOV_aligned __attribute__((aligned(sizeof(__m128i))))
-
+#include "Fql.h"
+#define QRUOV_aligned   __attribute__((aligned(sizeof(__m256i))))
+#define aligned_m       aligned_number(QRUOV_m, Fq , __m256i)
+#define aligned_M       aligned_number(QRUOV_M, Fql, __m256i)
+#define aligned_V       aligned_number(QRUOV_V, Fql, __m256i)

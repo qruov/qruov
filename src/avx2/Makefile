@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O3 -fomit-frame-pointer -Wno-unused-result -Wno-aggressive-loop-optimizations -I. -mavx2 -fopenmp # -march=native -mavx512f -DQRUOV_HASH_LEGACY # -ggdb3 
+CFLAGS=-O3 -fomit-frame-pointer -Wno-unused-result -Wno-aggressive-loop-optimizations -I. -march=native -fopenmp # -DQRUOV_HASH_LEGACY # -ggdb3
 LDFLAGS=-lcrypto -Wl,-Bstatic -lcrypto -Wl,-Bdynamic -lm
 OBJS=Fql.o mgf.o PQCgenKAT_sign.o qruov.o rng.o sign.o matrix.o
 
