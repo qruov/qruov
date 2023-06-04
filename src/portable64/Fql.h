@@ -1,458 +1,432 @@
 #pragma once
+
+#define Fql_h_DEBUG 0
+
+#if (Fql_h_DEBUG==2)
+
+#  define QRUOV_q                           7
+#  define QRUOV_L                          10
+
+#  if   (QRUOV_q==127) && (QRUOV_L== 3)
+#    define QRUOV_fc                        1
+#    define QRUOV_fe                        1
+#    define QRUOV_fc0                       1
+#  elif (QRUOV_q== 31) && (QRUOV_L== 3)
+#    define QRUOV_fc                        1
+#    define QRUOV_fe                        1
+#    define QRUOV_fc0                       1
+#  elif (QRUOV_q== 31) && (QRUOV_L==10)
+#    define QRUOV_fc                        5
+#    define QRUOV_fe                        3
+#    define QRUOV_fc0                       1
+#  elif (QRUOV_q==  7) && (QRUOV_L==10)
+#    define QRUOV_fc                        2
+#    define QRUOV_fe                        1
+#    define QRUOV_fc0                       1
+#  else
+#    error "unknown (QRUOV_q, QRUOV_L)"
+#  endif
+
+#  define QRUOV_security_strength_category 1
+#  define QRUOV_v                          156
+#  define QRUOV_m                          54
+
+#  define QRUOV_PLATFORM                   portable64
+#  define DO_NOT_QRUOV_CONFIG
+#endif
+
+#include "qruov_misc.h"
+
+#if ! ((QRUOV_q == 127) && (QRUOV_L ==  3 )|| \
+       (QRUOV_q ==  31) && (QRUOV_L ==  3 )|| \
+       (QRUOV_q ==  31) && (QRUOV_L == 10 )|| \
+       (QRUOV_q ==   7) && (QRUOV_L == 10 ))
+#    error "unsupported QRUOV_q and QRUOV_L in Fql_acc_reduce_1()"
+#endif
+
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
 #include <inttypes.h>
-
-#include "qruov_misc.h"
+#include <string.h>
+#include <stdlib.h>
 #include "mgf.h"
 
-/* =====================================================================
-   F_q, F_q[X]/(f(X))
-   ===================================================================== */
+#if Fql_h_DEBUG
+#  define Fq_reduction(X)    Fq_reduction_debug(X)
+#  define Fql_reduction(X)   Fql_reduction_debug(X)
+#  define Fql_acc_refresh(X) Fql_acc_refresh_debug(X)
+#  define Fql_acc_reduce(X)  Fql_acc_reduce_debug(X)
+#  define Fql_mul(X,Y)       Fql_mul_debug(X,Y)
+#else
+#  define Fq_reduction(X)    Fq_reduction_1(X)
+#  define Fql_reduction(X)   Fql_reduction_1(X)
+#  define Fql_acc_refresh(X) Fql_acc_refresh_1(X)
+#  define Fql_acc_reduce(X)  Fql_acc_reduce_1(X)
+#  define Fql_mul(X,Y)       Fql_mul_1(X,Y)
+#endif
+
+// ============================================================================
+// F_q  (q = 2^c - 1)
+// ============================================================================
 
 typedef uint8_t Fq ;
 
-inline static Fq Fq_add(Fq X, Fq Y){
-  int Z = (int) X + (int) Y ;
-  Z %= QRUOV_q ;
-  return (Fq)Z ;
+inline static Fq  Fq_RANDOM(){ return random() % QRUOV_q ; } // not for cryptography
+
+// ============================================================================
+// Fq_reduction
+// ============================================================================
+
+inline static int Fq_reduction_0(int Z){ return Z % QRUOV_q ; }
+
+inline static int Fq_reduction_1(int Z){
+      Z = (Z & QRUOV_q) + ((Z & ~QRUOV_q) >> QRUOV_ceil_log_2_q) ;
+  int C = ((Z+1) & ~QRUOV_q) ;
+      Z += (C>>QRUOV_ceil_log_2_q) ;
+      Z -= C ;
+  return Z ;
 }
 
-inline static Fq Fq_sub(Fq X, Fq Y){
-  int Z = (int) X - (int) Y + QRUOV_q ;
-  Z %= QRUOV_q ;
-  return (Fq)Z ;
-}
+inline static int Fq_reduction_debug(int Z);
 
-inline static Fq Fq_mul(Fq X, Fq Y){
-  int Z = (int) X * (int) Y ;
-  Z %= QRUOV_q ;
-  return (Fq)Z ;
-}
+// ============================================================================
+// Fq add/sub ...
+// ============================================================================
 
-inline static Fq Fq_inv(Fq X){
-  extern Fq Fq_inv_table[QRUOV_q] ;
-  return Fq_inv_table[X] ;
-}
+inline static Fq Fq_add(Fq X, Fq Y){ return (Fq)Fq_reduction((int)X+(int)Y) ; }
+inline static Fq Fq_sub(Fq X, Fq Y){ return (Fq)Fq_reduction((int)X-(int)Y+QRUOV_q) ; }
+inline static Fq Fq_mul(Fq X, Fq Y){ return (Fq)Fq_reduction((int)X*(int)Y) ; }
+inline static Fq Fq_inv(Fq X){ extern Fq Fq_inv_table[QRUOV_q] ; return Fq_inv_table[X] ; }
 
-inline static void Fq_vector_add(const size_t n, Fq * X, Fq * Y, Fq * Z){
-  for(size_t i=0; i<n; i++) Z[i] = Fq_add(X[i], Y[i]);
-}
+// ============================================================================
+// hardware
+// ============================================================================
+// ws: word size
+// wm: word mask
 
-inline static void Fq_vector_sub(const size_t n, Fq * X, Fq * Y, Fq * Z){
-  for(size_t i=0; i<n; i++) Z[i] = Fq_sub(X[i], Y[i]);
-}
+#if QRUOV_L == 3 
+#  define Fql_ws               (24)
+#  define Fql_wm               ((1ULL<<Fql_ws)-1)
+#  define Fql_mask_(n)         (((uint64_t)QRUOV_q)<<(Fql_ws*(n)))
+#  define Fql_mask             (Fql_mask_(0)|Fql_mask_(1)|Fql_mask_(2))
+#  define Fql_mask_one_(n)     (((uint64_t)1ULL)<<(Fql_ws*(n)))
+#  define Fql_mask_one         (Fql_mask_one_(0)|Fql_mask_one_(1)|Fql_mask_one_(2))
+#  define Fql_2_mask_(n)       (((uint64_t)((1<<(QRUOV_ceil_log_2_q*2))-1))<<(Fql_ws*(n)))
+#  define Fql_2_mask           (Fql_2_mask_(0)|Fql_2_mask_(1)|Fql_2_mask_(2))
+#  define Fql_acc_mask_(n)     (((UINT128_T)QRUOV_q)<<(Fql_ws*(n)))
+#  define Fql_acc_mask         (Fql_acc_mask_(0)|Fql_acc_mask_(1)|Fql_acc_mask_(2)|Fql_acc_mask_(3)|Fql_acc_mask_(4))
+#  define Fql_acc_mask_one_(n) (((UINT128_T)1ULL)<<(Fql_ws*(n)))
+#  define Fql_acc_mask_one     (Fql_acc_mask_one_(0)|Fql_acc_mask_one_(1)|Fql_acc_mask_one_(2)|Fql_acc_mask_one_(3)|Fql_acc_mask_one_(4))
+#  define Fql_2_acc_mask_(n)   (((UINT128_T)((1<<(QRUOV_ceil_log_2_q*2))-1))<<(Fql_ws*(n)))
+#  define Fql_2_acc_mask       (Fql_2_acc_mask_(0)|Fql_2_acc_mask_(1)|Fql_2_acc_mask_(2)|Fql_2_acc_mask_(3)|Fql_2_acc_mask_(4))
+#  define Fql_U_SIZE 1
+#elif QRUOV_L == 10 
+#  define Fql_ws               (16)
+#  define Fql_wm               ((1ULL<<Fql_ws)-1)
+#  define Fql_mask_(n)         (((uint64_t)QRUOV_q)<<(Fql_ws*(n)))
+#  define Fql_mask             (Fql_mask_(0)|Fql_mask_(1)|Fql_mask_(2)|Fql_mask_(3))
+#  define Fql_mask_one_(n)     (((uint64_t)1ULL)<<(Fql_ws*(n)))
+#  define Fql_mask_one         (Fql_mask_one_(0)|Fql_mask_one_(1)|Fql_mask_one_(2)|Fql_mask_one_(3))
+#  define Fql_2_mask_(n)       (((uint64_t)((1<<(QRUOV_ceil_log_2_q*2))-1))<<(Fql_ws*(n)))
+#  define Fql_2_mask           (Fql_2_mask_(0)|Fql_2_mask_(1)|Fql_2_mask_(2)|Fql_2_mask_(3))
+#  define Fql_U_SIZE 3
+#endif
+#define Fql_AU_SIZE  (2*(Fql_U_SIZE))
 
-inline static Fq Fq_vector_inner_product(const size_t n, Fq * X, Fq * Y){
-  uint64_t t = 0 ;
-  for(size_t i=0;i<n;i++) t += (uint64_t) X[i] * (uint64_t) Y[i] ;
-  return (Fq)(t % QRUOV_q) ;
-}
+typedef union Fql_union_t {
+  uint64_t c64[Fql_U_SIZE*1] ;
+  uint32_t c32[Fql_U_SIZE*2] ;
+  uint16_t c16[Fql_U_SIZE*4] ;
+  uint8_t  c8 [Fql_U_SIZE*8] ;
+} Fql_union ;
 
-#if ((QRUOV_q == 7)||(QRUOV_q == 31)) && QRUOV_L == 10 
+typedef union Fql_acc_union_t {
+  uint64_t  c64[Fql_AU_SIZE*1] ;
+  uint32_t  c32[Fql_AU_SIZE*2] ;
+  uint16_t  c16[Fql_AU_SIZE*4] ;
+  uint8_t   c8 [Fql_AU_SIZE*8] ;
+  Fql_union c                  ;
+} Fql_acc_union ;
 
-//  g(x) = \sum_{i=0}^10 a[i] * x^i |-> \sum_{i=0}^10 a[i] * (2^16)^i 
-
-typedef union Fql_t {
-  uint64_t c64[ 3] ;
-  uint32_t c32[ 6] ;
-  uint16_t c16[12] ;
-  uint8_t  c8 [24] ;
-} Fql ;
-
-typedef union Fql_accumulator_t {
-  Fql      c       ;
-  uint64_t c64[ 5] ;
-  uint32_t c32[10] ;
-  uint16_t c16[20] ;
-  uint8_t  c8 [40] ;
-} Fql_accumulator ;
-
-extern Fql Fql_zero ;
-extern Fql_accumulator Fql_accumulator_zero ;
-
-inline int Fql_eq(Fql A, Fql B){
-  return (A.c64[0] == B.c64[0])&&(A.c64[1] == B.c64[1])&&(A.c64[2] == B.c64[2]) ;
-}
-
-inline void Fql_print(char * header, Fql A){
-  printf("%s%016lx,%016lx,%016lx\n",header,A.c64[2], A.c64[1], A.c64[0]);
-}
-
-inline void Fql_accumulator_print(char * header, Fql_accumulator A){
-  printf("%s%016lx,%016lx,%016lx,%016lx,%016lx\n",header, A.c64[4], A.c64[3], A.c64[2], A.c64[1], A.c64[0]);
-}
-
-#define WORD_ORDER_LITTLE(i,j) ((i*4)+j)
-#define WORD_ORDER_BIG(i,j)    ((i*4)+(3-j))
-
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#  define WORD_ORDER(i,j) WORD_ORDER_LITTLE(i,j)
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#  define WORD_ORDER(i,j) WORD_ORDER_BIG(i,j)
-#else 
-#  error "unsupported WORD_ORDER()"
+#if QRUOV_L == 3
+typedef   uint64_t     Fql ;
+typedef   UINT128_T    Fql_acc ;
+#  define Fql_zero     ((Fql)0)
+#  define Fql_acc_zero ((Fql_acc)0)
+#elif QRUOV_L == 10
+typedef Fql_union      Fql ;
+typedef Fql_acc_union  Fql_acc ;
+extern  Fql            Fql_zero ;
+extern  Fql_acc        Fql_acc_zero ;
 #endif
 
-inline static Fql Fq2Fql(uint16_t c[QRUOV_L]){
-  Fql Z ; // = Fql_zero ;
-  int l ;
-  for(l=0;l<QRUOV_L;l++) {
-    int j = l &  3 ;
-    int i = l >> 2 ;
-    int k = WORD_ORDER(i,j) ;
-    Z.c16[k] = c[l] ;
-  }
-  for(   ;l<12;l++) {
-    int j = l &  3 ;
-    int i = l >> 2 ;
-    int k = WORD_ORDER(i,j) ;
-    Z.c16[k] = 0 ;
-  }
-  return Z ;
+// ============================================================================
+// F_q^L House keeping
+// ============================================================================
+
+inline static void Fql_fprint_n(FILE *stream, int n, char * header, void * A_){
+  Fql_acc_union * A = (Fql_acc_union *) A_ ;
+  fprintf(stream, "%s",header) ;
+  for(int i=n-1;i>=0;i--)fprintf(stream, "%016lx", A->c64[i]) ;
+  fprintf(stream, "\n") ;
 }
 
-inline static uint16_t Fql2Fq(Fql Z, int l){
-  int j = l &  3 ;
-  int i = l >> 2 ;
-  int k = WORD_ORDER(i,j) ;
-  return Z.c16[k] ;
+inline static void Fql_print_n  (int n, char * header, void * A_){ Fql_fprint_n(stderr, n,   header, A_) ; }
+inline static void Fql_print    (       char * header, Fql A    ){ Fql_print_n (Fql_U_SIZE,  header, &A) ; }
+inline static void Fql_acc_print(       char * header, Fql_acc A){ Fql_print_n (Fql_AU_SIZE, header, &A) ; }
+
+#define Fql_PRINT(a)      Fql_print(#a " = ", a)
+#define Fql_acc_PRINT(a)  Fql_acc_print(#a " = ", a)
+
+inline static int Fql_eq(Fql a, Fql b){ return memcmp(&a, &b, sizeof(Fql)) == 0 ; }
+inline static int Fql_ne(Fql a, Fql b){ return ! Fql_eq(a, b) ; }
+inline static int Fql_acc_eq(Fql_acc a, Fql_acc b){ return memcmp(&a, &b, sizeof(Fql_acc)) == 0 ; }
+inline static int Fql_acc_ne(Fql_acc a, Fql_acc b){ return ! Fql_acc_eq(a, b) ; }
+
+#if QRUOV_L ==  3
+inline static Fq  Fql2Fq(Fql Z, int i){ return ((Z >> ((Fql_ws)*i)) & QRUOV_q) ; }
+inline static Fql Fq2Fql(Fql z0, Fql z1, Fql z2){ return z0|(z1<<Fql_ws)|(z2<<(Fql_ws*2)) ; }
+inline static Fql_acc Fq2Fql_acc(Fql z0, Fql z1, Fql z2, Fql z3, Fql z4){
+  return ((UINT128_T)z0<<(Fql_ws*0))|
+         ((UINT128_T)z1<<(Fql_ws*1))|
+	 ((UINT128_T)z2<<(Fql_ws*2))|
+	 ((UINT128_T)z3<<(Fql_ws*3))|
+	 ((UINT128_T)z4<<(Fql_ws*4));
 }
-
-#  define Fql_mask0    ( (uint64_t)QRUOV_q     )
-#  define Fql_mask1    (((uint64_t)QRUOV_q)<<16)
-#  define Fql_mask2    (((uint64_t)QRUOV_q)<<32)
-#  define Fql_mask3    (((uint64_t)QRUOV_q)<<48)
-#  define Fql_mask     (Fql_mask0|Fql_mask1|Fql_mask2|Fql_mask3)
-
-inline static Fql Fql_reduction(Fql Z){
-  int l ;
-  for(l=0;l<QRUOV_L;l++){
-    int j = l &  3 ;
-    int i = l >> 2 ;
-    int k = WORD_ORDER(i,j) ;
-    Z.c16[k] %= QRUOV_q ;
-  }
-  for(   ;l<12;l++) {
-    int j = l &  3 ;
-    int i = l >> 2 ;
-    int k = WORD_ORDER(i,j) ;
-    Z.c16[k] = 0 ;
-  }
-  return Z ;
-}
-
-/*
-inline static Fql Fql_reduction_0(Fql Z_){
-  for(int k=0;k<3;k++){
-    uint64_t * Z = Z_.c64 + k ;
-    *Z = (*Z & Fql_mask) + ((*Z & ~Fql_mask) >> QRUOV_ceil_log_2_q) ;
-    if((*Z&Fql_mask0)==Fql_mask0) *Z^=Fql_mask0 ;
-    if((*Z&Fql_mask1)==Fql_mask1) *Z^=Fql_mask1 ;
-    if((*Z&Fql_mask2)==Fql_mask2) *Z^=Fql_mask2 ;
-    if((*Z&Fql_mask3)==Fql_mask3) *Z^=Fql_mask3 ;
-  }
-  return Z_ ;
-}
-*/
-
-inline static Fql Fql_add(Fql X, Fql Y){
-  Fql Z ;
-  for(int k=0; k<3; k++) Z.c64[k]  = X.c64[k] + Y.c64[k] ;
-  return Fql_reduction(Z) ;
-}
-
-inline static Fql Fql_sub(Fql X, Fql Y){
-  Fql Z ;
-  for(int k=0; k<3; k++) Z.c64[k] = Fql_mask + X.c64[k] - Y.c64[k] ;
-  return Fql_reduction(Z) ;
-}
-
-inline static Fql_accumulator Fql_accumulator_add(Fql_accumulator X, Fql_accumulator Y){
-  Fql_accumulator Z = X ;
-  for(int i=0; i<5; i++) Z.c64[i] += Y.c64[i] ;
-  return Z ;
-}
-
-inline static Fql_accumulator Fql_accumulator_mul(Fql X, Fql Y){
-  Fql_accumulator Z = Fql_accumulator_zero ;
-  for(int i=0; i<3; i++){
-    for(int j=0; j<3; j++) {
-      UINT128_T ZZ  = (UINT128_T)X.c64[i] * (UINT128_T)Y.c64[j] ;
-      Z.c64[i+j  ] += (uint64_t)ZZ ;
-      Z.c64[i+j+1] += (uint64_t)(ZZ>>64) ;
-    }
-  }
-  return Z ;
-}
-
-inline static Fql_accumulator Fql_accumulator_reduce_0(Fql_accumulator Z){
-  int l ;
-  for(l=0;l<19;l++){
-    int j = l &  3 ;
-    int i = l >> 2 ;
-    int k = WORD_ORDER(i,j) ;
-    Z.c16[k] %= QRUOV_q ;
-  }
-  for(  ;l<20;l++){
-    int j = l &  3 ;
-    int i = l >> 2 ;
-    int k = WORD_ORDER(i,j) ;
-    Z.c16[k] = 0 ;
-  }
-  return Z ;
-}
-
-#  if QRUOV_q == 7
-
-inline static Fql Fql_accumulator_reduce_1(Fql_accumulator Z){
-  uint64_t T2 = Z.c64[2] ;
-  uint64_t T3 = Z.c64[3] ;
-  uint64_t T4 = Z.c64[4] ;
-
-  uint64_t U3 = (T2>>32) | (T3<<32) ;
-  uint64_t U4 = (T3>>32) | (T4<<32) ;
-  uint64_t U5 = (T4>>32) ;
-
-  uint64_t V3 =            (U3<<17) ;
-  uint64_t V4 = (U3>>47) | (U4<<17) ;
-  uint64_t V5 = (T4>>15) ;
-
-  Z.c64[2] &= 0x00000000FFFFFFFFULL ;
-
-  Z.c64[0] += U3 ;
-  Z.c64[1] += U4 ;
-  Z.c64[2] += U5 ;
-
-  Z.c64[0] += V3 ;
-  Z.c64[1] += V4 ;
-  Z.c64[2] += V5 ;
-
-  return Fql_reduction(Z.c) ;
-}
-
-inline static Fql Fql_mul_1(Fql X, Fql Y){
-  uint16_t Z[19] ;
-  for(int i=0; i<19; i++) Z[i] = 0 ;
-
-  for(int i=0; i<10; i++){
-    for(int j=0; j<10; j++){
-      uint32_t ZZ = (uint32_t)Fql2Fq(X,i) * (uint32_t)Fql2Fq(Y,j) ;
-      Z[i+j  ] += (uint16_t)ZZ ;
-      Z[i+j+1] += (uint16_t)(ZZ>>16) ;
-    }
-  }
-  for(int i=0; i< 9; i++) Z[i] += Z[i+10] ;
-  for(int i=1; i<10; i++) Z[i] += Z[i+ 9] * 2 ;
-  for(int i=0; i<10; i++) Z[i] %= QRUOV_q ;
-  return Fq2Fql(Z) ;
-}
-
-inline static Fql Fql_accumulator_reduce(Fql_accumulator Z){
-  return Fql_accumulator_reduce_1(Fql_accumulator_reduce_0(Z)) ;
-}
-
-inline static Fql Fql_mul(Fql X, Fql Y){
-  Fql_accumulator Z = Fql_accumulator_mul(X, Y) ;
-  return Fql_accumulator_reduce_1(Z);
-}
-
-#  elif QRUOV_q == 31
-
-inline static Fql Fql_accumulator_reduce_1(Fql_accumulator Z){
-  uint64_t T2 = Z.c64[2] ;
-  uint64_t T3 = Z.c64[3] ;
-  uint64_t T4 = Z.c64[4] ;
-
-  uint64_t U3 = (T2>>32) | (T3<<32) ;
-  uint64_t U4 = (T3>>32) | (T4<<32) ;
-  uint64_t U5 = (T4>>32) ;
-
-  uint64_t V3 =            (U3<<48) ;
-  uint64_t V4 = (U3>>16) | (U4<<48) ;
-  uint64_t V5 = (U4>>16) | (U5<<48) ;
-
-  uint64_t W3 = V3 * 5 ;
-  uint64_t W4 = V4 * 5 ;
-  uint64_t W5 = V5 * 5 ;
-
-  uint64_t S3 = (W5>>32) ;
-  uint64_t S4 = S3 * 5 ;
-           S3 |= (S4<<48) ;
-           S4 >>= 16 ;
-
-  Z.c64[0] += U3 ;
-  Z.c64[1] += U4 ;
-  Z.c64[2] += U5 ;
-
-  Z.c64[0] += W3 ;
-  Z.c64[1] += W4 ;
-  Z.c64[2] += W5 ;
-
-  Z.c64[0] += S3 ;
-  Z.c64[1] += S4 ;
-  Z.c64[2] &= 0x00000000FFFFFFFFULL ;
-
-  return Fql_reduction(Z.c) ;
-}
-
-inline static Fql Fql_mul_1(Fql X, Fql Y){
-  uint32_t Z[19] ;
-  for(int i=0; i<19; i++) Z[i] = 0 ;
-
-  for(int i=0; i<10; i++){
-    for(int j=0; j<10; j++){
-      uint32_t ZZ = (uint32_t)Fql2Fq(X,i) * (uint32_t)Fql2Fq(Y,j) ;
-      Z[i+j  ] += (ZZ & 0x0000FFFF) ;
-      Z[i+j+1] += (ZZ>>16) ;
-    }
-  }
-
-  for(int i=0; i<=8; i++) Z[i] +=    Z[i+10] ;
-  for(int i=3; i<=9; i++) Z[i] +=  5*Z[i+ 7] ;
-  for(int i=0; i<=1; i++) Z[i] +=  5*Z[i+17] ;
-  for(int i=3; i<=4; i++) Z[i] += 25*Z[i+14] ;
-
-  uint16_t Z_[10] ;
-  for(int i=0; i<10; i++) Z_[i] = (uint16_t)(Z[i] % QRUOV_q) ;
-
-  return Fq2Fql(Z_) ;
-}
-
-inline static Fql Fql_accumulator_reduce(Fql_accumulator Z){
-  return Fql_accumulator_reduce_1(Fql_accumulator_reduce_0(Z)) ;
-}
-
-inline static Fql Fql_mul_0(Fql X, Fql Y){
-  Fql_accumulator Z = Fql_accumulator_mul(X, Y) ;
-  return Fql_accumulator_reduce(Z) ;
-}
-
-inline static Fql Fql_mul(Fql X, Fql Y){ return Fql_mul_0(X, Y); }
-
-#  else
-#    error "unsupported QRUOV_q in Fql_accumulator_reduce_1()"
+inline static Fql Fql_RANDOM(){ return Fq2Fql(Fq_RANDOM(), Fq_RANDOM(), Fq_RANDOM()) ; } // not for cryptography
+inline static Fql Fql_acc_RANDOM(){ return Fq2Fql_acc(Fq_RANDOM(), Fq_RANDOM(), Fq_RANDOM(), Fq_RANDOM(), Fq_RANDOM()) ; }
+#elif QRUOV_L == 10
+#  if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#    define WORD_ORDER(i)   (i)
+#  elif   __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#    define WORD_ORDER(i)   (((i>>2)<<2)+(3-(i&3)))
+#  else 
+#    error "unsupported WORD_ORDER()"
 #  endif
-
-#elif (QRUOV_q == 127 || QRUOV_q ==  31) && QRUOV_L ==  3
-
-//  f(x) = x^3 - x - 1
-//  g(x) = a0 + a1 * x + a2 * x^2 |-> a0 + a1 * 2^22 + a2 * (2^22)^2
-
-typedef uint64_t  Fql ;
-typedef UINT128_T Fql_accumulator ;
-
-#define Fql_zero ((Fql)0)
-#define Fql_accumulator_zero ((Fql_accumulator)0)
-
-inline int Fql_eq(Fql A, Fql B){
-  return (A==B) ;
-}
-
-inline static Fql Fq2Fql(Fql z0, Fql z1, Fql z2){
-  return z0|(z1<<22)|(z2<<44) ;
-}
-
-inline static Fq Fql2Fq(Fql Z, int i){
-  return ((Z >> (22*i)) & QRUOV_q) ;
-}
-
-#define Fql_mask0    ( (Fql)QRUOV_q     )
-#define Fql_mask1    (((Fql)QRUOV_q)<<22)
-#define Fql_mask2    (((Fql)QRUOV_q)<<44)
-#define Fql_mask     (Fql_mask0|Fql_mask1|Fql_mask2)
-
-inline static Fql Fql_reduction_0(Fql Z){
-  uint32_t z0 = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ;
-  uint32_t z1 = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ;
-  uint32_t z2 =  (uint32_t)Z            ;
-  z0 %= QRUOV_q ;
-  z1 %= QRUOV_q ;
-  z2 %= QRUOV_q ;
-  return Fq2Fql(z0, z1, z2) ;
-}
-
-inline static Fql Fql_reduction(Fql Z){
-  Z = (Z & Fql_mask) + ((Z & ~Fql_mask) >> QRUOV_ceil_log_2_q) ;
-  if((Z&Fql_mask0)==Fql_mask0) Z^=Fql_mask0 ;
-  if((Z&Fql_mask1)==Fql_mask1) Z^=Fql_mask1 ;
-  if((Z&Fql_mask2)==Fql_mask2) Z^=Fql_mask2 ;
+inline static Fq  Fql2Fq(Fql Z, int i){ return Z.c16[WORD_ORDER(i)] ; }
+inline static Fql Fq2Fql(uint16_t c[QRUOV_L]){
+  Fql Z ;
+  Z.c64[Fql_U_SIZE-1] = 0 ;
+  for(int i=0; i<QRUOV_L; i++) Z.c16[WORD_ORDER(i)] = c[i] ;
   return Z ;
 }
-
-inline static Fql Fql_add(Fql X, Fql Y){
-  return Fql_reduction(X+Y) ;
+inline static Fql_acc Fq2Fql_acc(uint16_t c[2*QRUOV_L-1]){
+  Fql_acc Z ;
+  Z.c64[Fql_AU_SIZE-1] = 0 ;
+  for(int i=0; i<2*QRUOV_L-1; i++) Z.c16[WORD_ORDER(i)] = c[i] ;
+  return Z ;
 }
-
-inline static Fql Fql_sub(Fql X, Fql Y){
-  return Fql_reduction(Fql_mask+X-Y) ;
+inline static Fql Fql_RANDOM(){
+  uint16_t c[QRUOV_L] ;
+  for(int i=0;i<QRUOV_L;i++)c[i]=Fq_RANDOM();
+  return Fq2Fql(c) ;
 }
-
-inline static Fql_accumulator Fql_accumulator_add(Fql_accumulator X, Fql_accumulator Y){
-  return X+Y ;
+inline static Fql_acc Fql_acc_RANDOM(){
+  uint16_t c[2*QRUOV_L-1] ;
+  for(int i=0;i<2*QRUOV_L-1;i++)c[i]=Fq_RANDOM();
+  return Fq2Fql_acc(c) ;
 }
+#endif
 
-inline static Fql_accumulator Fql_accumulator_mul(Fql X, Fql Y){
-  return (Fql_accumulator)X * (Fql_accumulator)Y ;
-}
+// ============================================================================
+// Fql_reduction
+// ============================================================================
 
-inline static Fql_accumulator Fql_accumulator_reduce_0(Fql_accumulator Z){
-  uint32_t z0  = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ; z0 %= QRUOV_q ;
-  uint32_t z1  = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ; z1 %= QRUOV_q ;
-  uint32_t z2  = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ; z2 %= QRUOV_q ;
-  uint32_t z3  = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ; z3 %= QRUOV_q ;
-  uint32_t z4  =  (uint32_t)Z                       ; z4 %= QRUOV_q ;
-  return ((Fql_accumulator)z0    )|
-         ((Fql_accumulator)z1<<22)|
-         ((Fql_accumulator)z2<<44)|
-         ((Fql_accumulator)z3<<66)|
-         ((Fql_accumulator)z4<<88);
-}
+// ============================================================================
+// Fq^L add/sub
+// ============================================================================
 
-inline static Fql Fql_accumulator_reduce(Fql_accumulator Z){
-  uint32_t z0 = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ;     // * 1 (14 bit)
-  uint32_t z1 = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ;     // * 2
-  uint32_t z2 = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ;     // * 3
-  uint32_t z3 = ((uint32_t)Z & 0x3FFFFF); Z >>= 22 ;     // * 2
-  uint32_t z4 =  (uint32_t)Z                       ;     // * 1
-           z0 += z3 ;                                    // * 3
-           z1 += z3 ;                                    // * 4
-           z1 += z4 ;                                    // * 5 (14 bit x 5)
-           z2 += z4 ;                                    // * 4
+// ============================================================================
+// Fq^L accumulator add/sub
+// ============================================================================
 
-  z0 %= QRUOV_q ;
-  z1 %= QRUOV_q ;
-  z2 %= QRUOV_q ;
+// ============================================================================
+// Fq^L accumulator refresh
+// ============================================================================
 
-  return Fq2Fql(z0, z1, z2) ;
-}
+// ============================================================================
+// Fq^L accumulator reduce
+// ============================================================================
 
-inline static Fql Fql_mul_0(Fql X, Fql Y){
-  Fql_accumulator Z = Fql_accumulator_mul(X, Y) ;
-  return Fql_accumulator_reduce(Z);
-}
+// ============================================================================
+// Fq^L mul
+// ============================================================================
 
-inline static Fql Fql_mul(Fql X, Fql Y){
-  UINT128_T Z = (UINT128_T)X * (UINT128_T)Y ;
-  Fql Z0 =   Z       ;
-  Fql Z1 =  (Z >>64) ;
-      Z1 >>= 2 ;
-      Z0 += Z1 ;
-      Z1 <<=22 ;
-      Z0 += Z1 ;
-
-      Z0 = (Z0 & Fql_mask) + ((Z0 & ~Fql_mask) >> QRUOV_ceil_log_2_q) ;
-      Z0 = (Z0 & Fql_mask) + ((Z0 & ~Fql_mask) >> QRUOV_ceil_log_2_q) ;
-      Z0 = (Z0 & Fql_mask) + ((Z0 & ~Fql_mask) >> QRUOV_ceil_log_2_q) ;
-  if((Z0&Fql_mask0)==Fql_mask0) Z0^=Fql_mask0 ;
-  if((Z0&Fql_mask1)==Fql_mask1) Z0^=Fql_mask1 ;
-  if((Z0&Fql_mask2)==Fql_mask2) Z0^=Fql_mask2 ;
-  return Z0 ;
-}
-
+#if   (QRUOV_q == 127) && (QRUOV_L == 3)
+#  include "Fql_L3.h"
+#elif (QRUOV_q ==  31) && (QRUOV_L == 3)
+#  include "Fql_L3.h"
+#elif (QRUOV_q ==  31) && (QRUOV_L == 10)
+#  include "Fql_L10.h"
+#  include "Fql_q31L10.h"
+#elif (QRUOV_q ==   7) && (QRUOV_L == 10)
+#  include "Fql_L10.h"
+#  include "Fql_q7L10.h"
 #else
-#  error "unsupported QRUOV_q and QRUOV_L in Fql.h"
+#  error "unknown (QRUOV_q, QRUOV_L)"
+#endif
+
+// ============================================================================
+// for debug
+// ============================================================================
+
+inline static int Fq_reduction_debug(int z){
+  int z0 = Fq_reduction_0(z) ;
+  static int flag = 1 ;
+  _Pragma("omp shared(flag)")
+  if(flag){
+    int z1 = Fq_reduction_1(z) ;
+    if(z0!=z1){
+      _Pragma("omp single")
+      {
+        fprintf(stderr, "error : Fq_reduction(z)\n") ;
+        flag = 0 ;
+      }
+    }
+  }
+  return z0 ;
+}
+
+inline static Fql Fql_reduction_debug(Fql z){
+  Fql z0 = Fql_reduction_0(z) ;
+  static int flag = 1 ;
+  _Pragma("omp shared(flag)")
+  if(flag){
+    Fql z1 = Fql_reduction_1(z) ;
+    if(Fql_ne(z0,z1)){
+      _Pragma("omp single")
+      {
+        fprintf(stderr, "error: Fql_reduction(z)\n") ;
+        Fql_PRINT(z) ;
+        Fql_PRINT(z0) ;
+        Fql_PRINT(z1) ;
+        flag = 0 ;
+      }
+    }
+  }
+  return z0 ;
+}
+
+inline static Fql_acc Fql_acc_refresh_debug(Fql_acc Z){
+  Fql_acc z0 = Fql_acc_refresh_0(Z) ;
+  static int flag = 1 ;
+  _Pragma("omp shared(flag)")
+  if(flag){
+    Fql_acc z1 = Fql_acc_refresh_1(Z) ;
+    if(Fql_acc_ne(z0,z1)){
+      _Pragma("omp single")
+      {
+        fprintf(stderr, "error: Fql_acc_refresh(z)\n") ;
+        flag = 0 ;
+      }
+    }
+  }
+  return z0 ;
+}
+
+inline static Fql Fql_acc_reduce_debug(Fql_acc z){
+  Fql z0 = Fql_acc_reduce_0(z) ;
+  static int flag = 1 ;
+  _Pragma("omp shared(flag)")
+  if(flag){
+    Fql z1 = Fql_acc_reduce_1(z) ;
+    if(Fql_ne(z0,z1)){
+      _Pragma("omp single")
+      {
+        fprintf(stderr, "error: Fql_acc_reduce(z)\n") ;
+        flag = 0 ;
+      }
+    }
+  }
+  return z0 ;
+}
+
+inline static Fql Fql_mul_debug(Fql X, Fql Y){
+  Fql z0 = Fql_mul_0(X, Y);
+  static int flag = 1 ;
+  _Pragma("omp shared(flag)")
+  if(flag){
+    Fql z1 = Fql_mul_1(X, Y) ;
+    if(Fql_ne(z0,z1)){
+      _Pragma("omp single")
+      {
+        fprintf(stderr, "error : Fql_mul\n") ;
+        Fql_PRINT(X) ;
+        Fql_PRINT(Y) ;
+        Fql_PRINT(z0) ;
+        Fql_PRINT(z1) ;
+        flag = 0 ;
+      }
+    }
+  }
+  return z0 ;
+}
+
+/* =====================================================================
+   for debug
+   ===================================================================== */
+
+#if (Fql_h_DEBUG==2)
+
+#if QRUOV_L == 10
+Fql             Fql_zero ;
+Fql_acc         Fql_acc_zero ;
+#endif
+
+int main(int argc, char * argv[]){
+
+  if(argc < 4) {
+    fprintf(stderr, "usage: %s FUNC ID N\n", argv[0]) ;
+    fprintf(stderr, "  %s\n" "  %s\n" "  %s\n",
+          "FUNC \\in {0,...,4}", "ID   \\in {0,1,2}", "N    \\in \\N" ) ;
+    return 1 ;
+  }
+
+  uint64_t func = atoll(argv[1])     ;
+  uint64_t ID   = atoll(argv[2])?1:0 ;
+  uint64_t n    = atoll(argv[3])     ;
+
+  Fql_acc  TT= Fql_acc_zero ;
+  Fql      T = Fql_zero ;
+  uint64_t t = 0 ;
+
+  printf("FUNC=%ld, ID=%ld, N=%ld\n",func,ID,n);
+  switch(ID){
+    case 0:
+      switch(func){
+        case 0:  for(uint64_t i=0; i<n; i++) t += Fq_reduction_0(i) ; break ;
+        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction_0(Fql_RANDOM())) ; break ;
+        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh_0(Fql_acc_RANDOM())) ; break ;
+        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce_0(Fql_acc_RANDOM())) ; break ;
+        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul_0(Fql_RANDOM(), Fql_RANDOM())); break ;
+      }
+      break ;
+    case 1:
+      switch(func){
+        case 0:  for(uint64_t i=0; i<n; i++) t += Fq_reduction_1(i) ; break ;
+        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction_1(Fql_RANDOM())) ; break ;
+        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh_1(Fql_acc_RANDOM())) ; break ;
+        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce_1(Fql_acc_RANDOM())) ; break ;
+        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul_1(Fql_RANDOM(), Fql_RANDOM())); break ;
+      }
+      break;
+    default:
+      switch(func){
+        case 0:  for(uint64_t i=0; i<n; i++) t += Fq_reduction(i) ; break ;
+        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction(Fql_RANDOM())) ; break ;
+        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh(Fql_acc_RANDOM())) ; break ;
+        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce(Fql_acc_RANDOM())) ; break ;
+        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul(Fql_RANDOM(), Fql_RANDOM())); break ;
+      }
+      break;
+  }
+  printf("%ld\n", t) ;
+  Fql_PRINT(T) ;
+  Fql_acc_PRINT(TT) ;
+  return 0 ;
+}
+
 #endif
 
 /* =====================================================================

@@ -6,13 +6,13 @@
   _Pragma("omp parallel for private(_i,_j,_k) shared(A, B, C)")    \
   for(_i=0;_i<N;_i++){                                             \
     for(_j=0;_j<M;_j++){                                           \
-      Element ## _ACCUMULATOR _t ;                                 \
-      Element ## _ACCUMULATOR_ZERO(_t) ;                           \
+      Element ## _ACC _t ;                                 \
+      Element ## _ACC_ZERO(_t) ;                           \
       int k_POOL = k_THRESHOLD ;                                   \
       for(_k=0;_k<K;_k++){                                         \
-        Element ## _ACCUMULATE_MUL(A[_i][_k], B[_k][_j], _t) ;     \
+        Element ## _ACC_MUL_ADD(A[_i][_k], B[_k][_j], _t) ;     \
       }                                                            \
-      Element ## _ACCUMULATOR_REDUCE(_t, C[_i][_j]) ;              \
+      Element ## _ACC_REDUCE(_t, C[_i][_j]) ;              \
     }                                                              \
   }                                                                \
 }
@@ -23,14 +23,14 @@
   _Pragma("omp parallel for private(_i,_j,_k) shared(A, B, C)")    \
   for(_i=0;_i<N;_i++){                                             \
     for(_j=0;_j<M;_j++){                                           \
-      Element ## _ACCUMULATOR _t ;                                 \
-      Element ## _ACCUMULATOR_ZERO(_t) ;                           \
+      Element ## _ACC _t ;                                 \
+      Element ## _ACC_ZERO(_t) ;                           \
       int k_POOL = k_THRESHOLD ;                                   \
       for(_k=0;_k<K;_k++){                                         \
-        Element ## _ACCUMULATE_MUL(A[_i][_k], B[_k][_j], _t) ;     \
+        Element ## _ACC_MUL_ADD(A[_i][_k], B[_k][_j], _t) ;     \
       }                                                            \
       Element _v ;                                                 \
-      Element ## _ACCUMULATOR_REDUCE(_t, _v) ;                     \
+      Element ## _ACC_REDUCE(_t, _v) ;                     \
       Element ## _ADD(_v, C[_i][_j], C[_i][_j]) ;                  \
     }                                                              \
   }                                                                \
@@ -71,55 +71,55 @@
 
 #if (QRUOV_L == 3)
 
-#  define Fql_ACCUMULATOR                 UINT128_T
-#  define Fql_ACCUMULATOR_ZERO(a)         { a = Fql_accumulator_zero ; }
+#  define Fql_ACC                 UINT128_T
+#  define Fql_ACC_ZERO(a)         { a = Fql_acc_zero ; }
 
-#    define k_THRESHOLD                     (1<<(22-2*QRUOV_ceil_log_2_q))
+#    define k_THRESHOLD                     (1<<(Fql_ws-2*QRUOV_ceil_log_2_q))
 
 #  if (QRUOV_v > k_THRESHOLD)
-#    define Fql_ACCUMULATE_MUL(a,b,c)        \
+#    define Fql_ACC_MUL_ADD(a,b,c)        \
      {                                       \
         c += (UINT128_T)a * (UINT128_T)b ;   \
         k_POOL -= QRUOV_L ;                  \
         if(k_POOL < QRUOV_L){                \
-          c = Fql_accumulator_reduce_0(c) ;  \
+          c = Fql_acc_refresh(c) ;  \
           k_POOL = k_THRESHOLD ;             \
         } ;                                  \
      }
 #  else
-#    define Fql_ACCUMULATE_MUL(a,b,c)       { c += (UINT128_T)a * (UINT128_T)b ; }
+#    define Fql_ACC_MUL_ADD(a,b,c)       { c += (UINT128_T)a * (UINT128_T)b ; }
 #  endif
 
-#  define Fql_ACCUMULATOR_REDUCE(a,c)     { c = Fql_accumulator_reduce(a) ; }
+#  define Fql_ACC_REDUCE(a,c)     { c = Fql_acc_reduce(a) ; }
 
 #elif (QRUOV_L == 10)
 
-#  define Fql_ACCUMULATOR                 Fql_accumulator 
-#  define Fql_ACCUMULATOR_ZERO(a)         { a = Fql_accumulator_zero ; }
+#  define Fql_ACC                 Fql_acc 
+#  define Fql_ACC_ZERO(a)         { a = Fql_acc_zero ; }
 
 #  define k_THRESHOLD                     (1<<(16-2*QRUOV_ceil_log_2_q))
 #  define k_MASK                          (k_THRESHOLD-1)
 
 #  if (QRUOV_v > k_THRESHOLD)
-#    define Fql_ACCUMULATE_MUL(a,b,c)        \
+#    define Fql_ACC_MUL_ADD(a,b,c)        \
      {                                       \
-        c = Fql_accumulator_add(c, Fql_accumulator_mul(a,b)) ; \
+        c = Fql_acc_add(c, Fql_acc_mul(a,b)) ; \
         k_POOL -= QRUOV_L ;                  \
         if(k_POOL < QRUOV_L){                \
-          c = Fql_accumulator_reduce_0(c) ;  \
+          c = Fql_acc_refresh(c) ;  \
           k_POOL = k_THRESHOLD ;             \
         } ;                                  \
      }
 #  else
-#    define Fql_ACCUMULATE_MUL(a,b,c)       { c = Fql_accumulator_add(c, Fql_accumulator_mul(a,b)) ; }
+#    define Fql_ACC_MUL_ADD(a,b,c)       { c = Fql_acc_add(c, Fql_acc_mul(a,b)) ; }
 #  endif
 
-#  define Fql_ACCUMULATOR_REDUCE(a,c)     { c = Fql_accumulator_reduce(a) ; }
+#  define Fql_ACC_REDUCE(a,c)     { c = Fql_acc_reduce(a) ; }
 
-#define Fql_ACCUMULATOR_DEBUG                   Fql
-#define Fql_ACCUMULATOR_ZERO_DEBUG(a)           { a = Fql_zero ; }
-#define Fql_ACCUMULATE_MUL_DEBUG(a,b,c)         { c = Fql_add(c, Fql_mul(a,b)) ; }
-#define Fql_ACCUMULATOR_REDUCE_DEBUG(a,c)       { c = a ; }
+#define Fql_ACC_DEBUG                   Fql
+#define Fql_ACC_ZERO_DEBUG(a)           { a = Fql_zero ; }
+#define Fql_ACC_MUL_ADD_DEBUG(a,b,c)         { c = Fql_add(c, Fql_mul(a,b)) ; }
+#define Fql_ACC_REDUCE_DEBUG(a,c)       { c = a ; }
 
 #else
 #  error "unsupported QRUOV_L for matrix.h"
@@ -158,13 +158,13 @@ void EQN_GEN(VECTOR_V vineger, MATRIX_MxV F2T[QRUOV_m], Fq eqn[QRUOV_m][QRUOV_m]
 #pragma omp parallel for private(i,j,k) shared(vineger, F2T, eqn)
   for(i=0; i<QRUOV_m; i++){
     for(j=0; j<QRUOV_M; j++){
-      Fql_accumulator t = Fql_accumulator_zero ;
+      Fql_acc t = Fql_acc_zero ;
       int k_POOL = k_THRESHOLD ;
       for(k=0; k<QRUOV_V; k++){
-        Fql_ACCUMULATE_MUL(vineger[k], F2T[i][j][k], t) ;
+        Fql_ACC_MUL_ADD(vineger[k], F2T[i][j][k], t) ;
       }
       Fql u ;
-      Fql_ACCUMULATOR_REDUCE(t, u) ;
+      Fql_ACC_REDUCE(t, u) ;
       u = Fql_add(u,u) ;
       for(int l=0; l<QRUOV_L; l++){
         eqn[i][QRUOV_L*j+l] = Fql2Fq(u, QRUOV_perm(l)) ; // <- unpack_1(...)
@@ -179,12 +179,12 @@ void C_GEN(VECTOR_V vineger, MATRIX_VxV F1[QRUOV_m], Fq c[QRUOV_m]){
   for(i=0; i<QRUOV_m; i++){
     Fql tmp [QRUOV_V] ;
     for(j=0; j<QRUOV_V; j++){
-      Fql_accumulator t = Fql_accumulator_zero ;
+      Fql_acc t = Fql_acc_zero ;
       int k_POOL = k_THRESHOLD ;
       for(k=0; k<QRUOV_V; k++){
-        Fql_ACCUMULATE_MUL(vineger[k], F1[i][j][k], t) ;
+        Fql_ACC_MUL_ADD(vineger[k], F1[i][j][k], t) ;
       }
-      Fql_ACCUMULATOR_REDUCE(t, tmp[j]) ;
+      Fql_ACC_REDUCE(t, tmp[j]) ;
     }
     uint64_t c_i = 0 ;
     for(k=0; k<QRUOV_V; k++){
@@ -198,13 +198,13 @@ void SIG_GEN(VECTOR_M oil, MATRIX_MxV SdT, VECTOR_V vineger, QRUOV_SIGNATURE sig
   int i,j ;
 #pragma omp parallel for private(i,j) shared(oil, SdT, vineger, sig)
   for(i=0;i<QRUOV_V;i++){
-    Fql_accumulator t = Fql_accumulator_zero ;
+    Fql_acc t = Fql_acc_zero ;
     int k_POOL = k_THRESHOLD ;
     for(j=0;j<QRUOV_M;j++){
-      Fql_ACCUMULATE_MUL(oil[j], SdT[j][i], t) ;
+      Fql_ACC_MUL_ADD(oil[j], SdT[j][i], t) ;
     }
     Fql u ;
-    Fql_ACCUMULATOR_REDUCE(t, u) ;
+    Fql_ACC_REDUCE(t, u) ;
     sig->s[i] = Fql_sub(vineger[i], u) ;
   }
   for(i=QRUOV_V;i<QRUOV_N;i++){

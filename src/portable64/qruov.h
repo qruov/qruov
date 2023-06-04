@@ -153,8 +153,8 @@ inline static void store_Fql(
   uint8_t       * pool,            // bit pool
   size_t        * pool_bits        // current bit index
 ){
-  Fq x0 = (Fq)X & QRUOV_q ; X >>= 22 ;
-  Fq x1 = (Fq)X & QRUOV_q ; X >>= 22 ;
+  Fq x0 = (Fq)X & QRUOV_q ; X >>= Fql_ws ;
+  Fq x1 = (Fq)X & QRUOV_q ; X >>= Fql_ws ;
   Fq x2 = (Fq)X & QRUOV_q ;
   store_Fq(x0, pool, pool_bits) ;
   store_Fq(x1, pool, pool_bits) ;
@@ -166,8 +166,8 @@ inline static Fql restore_Fql(
   size_t        * pool_bits        // current bit index
 ){
   Fql a0 = restore_Fq(pool, pool_bits) ;
-  Fql a1 = restore_Fq(pool, pool_bits) ; a1 <<= 22 ;
-  Fql a2 = restore_Fq(pool, pool_bits) ; a2 <<= 44 ;
+  Fql a1 = restore_Fq(pool, pool_bits) ; a1 <<= (Fql_ws) ;
+  Fql a2 = restore_Fq(pool, pool_bits) ; a2 <<= (Fql_ws*2) ;
   return a0|a1|a2 ;
 }
 

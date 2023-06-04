@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include "qruov.h"
+#include "Fql.h"
 
 #if QRUOV_q == 7
   Fq Fq_inv_table[QRUOV_q] = {0,1,4,5,2,3,6} ;
@@ -75,8 +76,8 @@ Fql Fql_random(Fql_RANDOM_CTX ctx) {
 
 #elif QRUOV_L == 10
 
-Fql Fql_zero ;
-Fql_accumulator Fql_accumulator_zero ;
+Fql     Fql_zero ;
+Fql_acc Fql_acc_zero ;
 
 Fql Fql_random(Fql_RANDOM_CTX ctx) {
   uint16_t a[QRUOV_L] ;

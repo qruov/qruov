@@ -6,14 +6,16 @@
       - openssl-1.1.1t
       - openssl-3.1.0
     - sampling order of P1 and P2
+    - ref
+      - portable
     - portable64
-      - 21 bit accumulation for extension of degree 3
+      - 22 bit accumulation for extension of degree 3
       - 16 bit accumulation
   - working:
     - avx2
-      - not so optimized
+      - based on ref. not so optimized
     - avx512
-      - not so optimized
+      - based on ref. not so optimized
   - todo:
     - secret independent
       - rejection sampling

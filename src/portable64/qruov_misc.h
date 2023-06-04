@@ -1,5 +1,7 @@
 #pragma once
-#include "qruov_config.h"
+#ifndef DO_NOT_QRUOV_CONFIG
+#  include "qruov_config.h"
+#endif
 
 /*
   QRUOV_security_strength_category // 1/3/5

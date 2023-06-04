@@ -1,6 +1,15 @@
-#include <string.h>
-#include "api.h"
-#include "rng.h"
+#ifdef SUPERCOP
+#  include "crypto_sign.h"
+
+#  include <string.h>
+#  include "randombytes.h"
+#  include "qruov.h"
+#  include "api.h"
+#else
+#  include <string.h>
+#  include "api.h"
+#  include "rng.h"
+#endif
 
 int
 crypto_sign_keypair(unsigned char *pk, unsigned char *sk)
