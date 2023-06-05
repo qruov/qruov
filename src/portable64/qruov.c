@@ -428,7 +428,7 @@ void QRUOV_Sign (
     Fql_RANDOM_CTX_copy(msg_ctx, msg_ctx_2) ;
     Fql_srandom_update(sig->r, QRUOV_SALT_LEN, msg_ctx_2) ;
     for(i=0; i<m; i++) msg[i] = Fq_random(msg_ctx_2) ;
-    for(i=0; i<m; i++) b[i]   = Fq_sub(msg[i], c[i]) ;
+    for(i=0; i<m; i++) b[i] = Fq_sub(msg[i], c[i]) ;
     Fq_random_final(msg_ctx_2) ;
   }while(!consistent(echelon_form, b, &cacheR, R)) ;
   MGF_final(r_ctx) ;

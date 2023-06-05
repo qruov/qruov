@@ -1,0 +1,10 @@
+/* =====================================================================
+   signature
+   ===================================================================== */
+
+typedef uint8_t QRUOV_SALT  [QRUOV_SALT_LEN] ;
+
+TYPEDEF_STRUCT(QRUOV_SIGNATURE,
+  QRUOV_SALT r           ;
+  Fql        s [QRUOV_N] ;
+) ;

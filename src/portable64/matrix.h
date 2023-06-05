@@ -1,5 +1,6 @@
 #pragma once
 #include "qruov_misc.h"
+#include "Fql.h"
 
 typedef Fql        VECTOR_V        [QRUOV_V]        ;
 typedef Fql        VECTOR_M        [QRUOV_M]        ;

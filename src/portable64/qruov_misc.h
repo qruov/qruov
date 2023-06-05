@@ -116,5 +116,10 @@ typedef struct TYPE_NAME ## _t {                    \
   abort(); \
 }
 
+// ==============================================================
+// integer types
+// ==============================================================
+
+#include <inttypes.h>
 typedef          __int128  INT128_T ;
 typedef unsigned __int128 UINT128_T ;

@@ -72,7 +72,7 @@
 
 typedef uint8_t Fq ;
 
-inline static Fq  Fq_RANDOM(){ return random() % QRUOV_q ; } // not for cryptography
+inline static Fq  Fq_ncRANDOM(){ return random() % QRUOV_q ; } // not for cryptography
 
 // ============================================================================
 // Fq_reduction
@@ -194,8 +194,9 @@ inline static Fql_acc Fq2Fql_acc(Fql z0, Fql z1, Fql z2, Fql z3, Fql z4){
 	 ((UINT128_T)z3<<(Fql_ws*3))|
 	 ((UINT128_T)z4<<(Fql_ws*4));
 }
-inline static Fql Fql_RANDOM(){ return Fq2Fql(Fq_RANDOM(), Fq_RANDOM(), Fq_RANDOM()) ; } // not for cryptography
-inline static Fql Fql_acc_RANDOM(){ return Fq2Fql_acc(Fq_RANDOM(), Fq_RANDOM(), Fq_RANDOM(), Fq_RANDOM(), Fq_RANDOM()) ; }
+// non cryptographic random
+inline static Fql Fql_ncRANDOM(){ return Fq2Fql(Fq_ncRANDOM(), Fq_ncRANDOM(), Fq_ncRANDOM()) ; }
+inline static Fql Fql_acc_ncRANDOM(){ return Fq2Fql_acc(Fq_ncRANDOM(), Fq_ncRANDOM(), Fq_ncRANDOM(), Fq_ncRANDOM(), Fq_ncRANDOM()) ; }
 #elif QRUOV_L == 10
 #  if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #    define WORD_ORDER(i)   (i)
@@ -217,14 +218,14 @@ inline static Fql_acc Fq2Fql_acc(uint16_t c[2*QRUOV_L-1]){
   for(int i=0; i<2*QRUOV_L-1; i++) Z.c16[WORD_ORDER(i)] = c[i] ;
   return Z ;
 }
-inline static Fql Fql_RANDOM(){
+inline static Fql Fql_ncRANDOM(){
   uint16_t c[QRUOV_L] ;
-  for(int i=0;i<QRUOV_L;i++)c[i]=Fq_RANDOM();
+  for(int i=0;i<QRUOV_L;i++)c[i]=Fq_ncRANDOM();
   return Fq2Fql(c) ;
 }
-inline static Fql_acc Fql_acc_RANDOM(){
+inline static Fql_acc Fql_acc_ncRANDOM(){
   uint16_t c[2*QRUOV_L-1] ;
-  for(int i=0;i<2*QRUOV_L-1;i++)c[i]=Fq_RANDOM();
+  for(int i=0;i<2*QRUOV_L-1;i++)c[i]=Fq_ncRANDOM();
   return Fq2Fql_acc(c) ;
 }
 #endif
@@ -396,28 +397,28 @@ int main(int argc, char * argv[]){
     case 0:
       switch(func){
         case 0:  for(uint64_t i=0; i<n; i++) t += Fq_reduction_0(i) ; break ;
-        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction_0(Fql_RANDOM())) ; break ;
-        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh_0(Fql_acc_RANDOM())) ; break ;
-        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce_0(Fql_acc_RANDOM())) ; break ;
-        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul_0(Fql_RANDOM(), Fql_RANDOM())); break ;
+        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction_0(Fql_ncRANDOM())) ; break ;
+        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh_0(Fql_acc_ncRANDOM())) ; break ;
+        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce_0(Fql_acc_ncRANDOM())) ; break ;
+        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul_0(Fql_ncRANDOM(), Fql_ncRANDOM())); break ;
       }
       break ;
     case 1:
       switch(func){
         case 0:  for(uint64_t i=0; i<n; i++) t += Fq_reduction_1(i) ; break ;
-        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction_1(Fql_RANDOM())) ; break ;
-        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh_1(Fql_acc_RANDOM())) ; break ;
-        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce_1(Fql_acc_RANDOM())) ; break ;
-        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul_1(Fql_RANDOM(), Fql_RANDOM())); break ;
+        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction_1(Fql_ncRANDOM())) ; break ;
+        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh_1(Fql_acc_ncRANDOM())) ; break ;
+        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce_1(Fql_acc_ncRANDOM())) ; break ;
+        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul_1(Fql_ncRANDOM(), Fql_ncRANDOM())); break ;
       }
       break;
     default:
       switch(func){
         case 0:  for(uint64_t i=0; i<n; i++) t += Fq_reduction(i) ; break ;
-        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction(Fql_RANDOM())) ; break ;
-        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh(Fql_acc_RANDOM())) ; break ;
-        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce(Fql_acc_RANDOM())) ; break ;
-        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul(Fql_RANDOM(), Fql_RANDOM())); break ;
+        case 1:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_reduction(Fql_ncRANDOM())) ; break ;
+        case 2:  for(uint64_t i=0; i<n; i++) TT= Fql_acc_add(TT, Fql_acc_refresh(Fql_acc_ncRANDOM())) ; break ;
+        case 3:  for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_acc_reduce(Fql_acc_ncRANDOM())) ; break ;
+        default: for(uint64_t i=0; i<n; i++) T = Fql_add(T, Fql_mul(Fql_ncRANDOM(), Fql_ncRANDOM())); break ;
       }
       break;
   }
