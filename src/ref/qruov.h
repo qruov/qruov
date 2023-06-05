@@ -17,18 +17,6 @@
    QRUOV functions
    ===================================================================== */
 
-typedef MATRIX_VxM QRUOV_Sd                         ;
-typedef MATRIX_MxV QRUOV_SdT                        ;
-typedef MATRIX_VxV QRUOV_P1        [QRUOV_m]        ;
-typedef MATRIX_VxM QRUOV_P2        [QRUOV_m]        ;
-typedef MATRIX_MxV QRUOV_P2T       [QRUOV_m]        ;
-typedef MATRIX_MxM QRUOV_P3        [QRUOV_m]        ;
-
-TYPEDEF_STRUCT(QRUOV_SIGNATURE,
-  QRUOV_SALT r           ;
-  Fql        s [QRUOV_N] ;
-) ;
-
 //
 // SECRET       KEY : (sk_seed,        ,   )
 // SIGNING      KEY : (sk_seed, pk_seed,   )

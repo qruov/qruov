@@ -410,41 +410,9 @@ void QRUOV_Sign (
   Fql_srandom(vineger_seed, ctx) ;
   Fql_random_vector(ctx, V, vineger) ;
 
-#pragma omp parallel for private(i,j,k) shared(vineger, F2T, eqn)
-  for(i=0;i<m; i++){
-    for(j=0; j<M; j++){
-      Fql t = Fql_zero ;
-      for(k=0; k<V; k++){
-        t = Fql_add(t, Fql_mul(vineger[k],F2T[i][j][k])) ;
-      }
-      t = Fql_add(t,t) ;
-      for(int l=0; l<L; l++){
-        eqn[i][L*j+l] = t.c[QRUOV_perm(l)] ; // <- unpack_1(...) 
-      }
-    }
-  }
-
+  EQN_GEN(vineger, F2T, eqn) ;
   LU_decompose(eqn, echelon_form) ;
-
-#pragma omp parallel for private(i,j,k) shared(vineger, F1, c)
-  for(i=0;i<m; i++){
-    Fql tmp [V] ;
-
-    for(j=0; j<V; j++){
-      Fql t = Fql_zero ;
-      for(k=0; k<V; k++){
-        t = Fql_add(t, Fql_mul(vineger[k],F1[i][j][k])) ;
-      }
-      tmp[j] = t ;
-    }
-
-    uint64_t c_i = 0 ;
-    for(k=0; k<V; k++){
-      c_i += (uint64_t)(Fql_mul(tmp[k],vineger[k]).c[QRUOV_perm(0)]); // <-- shrink
-    }
-
-    c[i] = (Fq)(c_i % QRUOV_q) ;
-  }
+  C_GEN(vineger, F1, c) ;
 
   Fql_RANDOM_CTX msg_ctx   ; Fql_srandom_init(Msg, Msg_len, msg_ctx) ;
   Fql_RANDOM_CTX msg_ctx_2 ;
@@ -465,16 +433,7 @@ void QRUOV_Sign (
 
   pack_0(oil_u, oil) ;
 
-  for(i=0;i<V;i++){
-    Fql t = Fql_zero ;
-    for(j=0;j<M;j++){
-      t = Fql_add(t, Fql_mul(oil[j],SdT[j][i])) ;
-    }
-    sig->s[i] = Fql_sub(vineger[i], t) ;
-  }
-  for(i=V;i<N;i++){
-    sig->s[i] = oil[i-V] ;
-  }
+  SIG_GEN(oil, SdT, vineger, sig) ;
 
   OPENSSL_cleanse(Sd, sizeof(MATRIX_VxM)) ;
   OPENSSL_cleanse(SdT, sizeof(MATRIX_MxV)) ;
@@ -507,10 +466,7 @@ int QRUOV_Verify(
   MATRIX_VxM * P2   = (MATRIX_VxM *) malloc(sizeof(QRUOV_P2)) ;
   MATRIX_MxV * P2T  = (MATRIX_MxV *) malloc(sizeof(QRUOV_P2T)) ;
 
-  if ( (P1==NULL) || (P2==NULL) || (P2T==NULL) ) {
-    ERROR_ABORT("malloc fail") ;
-  }
-
+  if ((P1==NULL)||(P2==NULL)||(P2T==NULL)) ERROR_ABORT("malloc fail") ;
 
   const Fql * vineger = sig->s ;
   const Fql * oil     = sig->s + V ;
@@ -519,44 +475,10 @@ int QRUOV_Verify(
 
   SAMPLE_P1P2(pk_seed, P1, P2, P2T) ;
 
-  int result [m] ;
-#pragma omp parallel for private(i,j,k,t) shared(P1, P2T, P3, oil, vineger, msg, result)
-  for(i=0; i<m; i++){
-    Fql tmp_v [V] ;
-    Fql tmp_o [M] ;
-    for(j=0;j<V;j++){
-      t = Fql_zero ;
-      for(k=0;k<M;k++){
-        t = Fql_add(t, Fql_mul(P2T[i][k][j],oil[k])) ; // <-
-      }
-      t = Fql_add(t,t) ;
-      for(k=0;k<V;k++){
-        t = Fql_add(t, Fql_mul(P1[i][j][k],vineger[k])) ;
-      }
-      tmp_v[j] = t ;
-    }
+  uint8_t result [QRUOV_m] ;
 
-    for(j=0;j<M;j++){
-      t = Fql_zero ;
-      for(k=0;k<M;k++){
-        t = Fql_add(t, Fql_mul(P3[i][j][k],oil[k])) ;
-      }
-      tmp_o[j] = t ;
-    }
+  RESULT_GEN(P1, P2T, P3, oil, vineger, msg, result) ;
 
-    t = Fql_zero ;
-    for(j=0;j<V;j++){
-      t = Fql_add(t, Fql_mul(vineger[j],tmp_v[j])) ;
-    }
-    for(j=0;j<M;j++){
-      t = Fql_add(t, Fql_mul(oil[j],tmp_o[j])) ;
-    }
-    if(msg[i] != t.c[QRUOV_perm(0)]){ // <-- shrink
-      result[i] = 0 ;
-    }else{
-      result[i] = 1 ;
-    }
-  }
   free(P1) ; free(P2) ; free(P2T) ;
   for(i=0;i<m;i++){
     if(result[i] == 0) return 0 ;

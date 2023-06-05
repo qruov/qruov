@@ -1,5 +1,7 @@
 #pragma once
-#include "qruov_config.h"
+#ifndef DO_NOT_QRUOV_CONFIG
+#  include "qruov_config.h"
+#endif
 
 /*
   QRUOV_security_strength_category // 1/3/5
@@ -10,7 +12,7 @@
   QRUOV_fc                         // fc
   QRUOV_fe                         // fe
   QRUOV_fc0                        // fc0
-  QRUOV_PLATFORM                   // ref/portable64/avx2/avx512
+  QRUOV_PLATFORM                   // ref/portable/avx2/avx512
 */
 
 #ifndef QRUOV_security_strength_category
@@ -113,3 +115,11 @@ typedef struct TYPE_NAME ## _t {                    \
   fprintf(stderr, "runtime error: %s in file: %s, line: %d.\n",MESSAGE,__FILE__,__LINE__); \
   abort(); \
 }
+
+// ==============================================================
+// integer types
+// ==============================================================
+
+#include <inttypes.h>
+typedef          __int128  INT128_T ;
+typedef unsigned __int128 UINT128_T ;

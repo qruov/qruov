@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "qruov.h"
+#include "qruov_misc.h"
 
 char * format =
   "#pragma once\n"

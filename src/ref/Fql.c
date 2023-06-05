@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include "qruov.h"
+#include "Fql.h"
 
 Fql Fql_zero ;
 
