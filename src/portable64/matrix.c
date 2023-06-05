@@ -1,156 +1,139 @@
 #include "qruov.h"
 
 // C = A*B
-#define MATRIX_MUL(Element, N, K, M, A, B, C) {                    \
+#define MATRIX_MUL(N, K, M, A, B, C) {                             \
   int _i,_j,_k ;                                                   \
   _Pragma("omp parallel for private(_i,_j,_k) shared(A, B, C)")    \
   for(_i=0;_i<N;_i++){                                             \
     for(_j=0;_j<M;_j++){                                           \
-      Element ## _ACC _t ;                                 \
-      Element ## _ACC_ZERO(_t) ;                           \
+      Fql_ACC _t ;                                                 \
+      Fql_ACC_ZERO(_t) ;                                           \
       int k_POOL = k_THRESHOLD ;                                   \
       for(_k=0;_k<K;_k++){                                         \
-        Element ## _ACC_MUL_ADD(A[_i][_k], B[_k][_j], _t) ;     \
+        Fql_ACC_MUL_ADD(A[_i][_k], B[_k][_j], _t) ;                \
       }                                                            \
-      Element ## _ACC_REDUCE(_t, C[_i][_j]) ;              \
+      Fql_ACC_REDUCE(_t, C[_i][_j]) ;                              \
     }                                                              \
   }                                                                \
 }
 
 // C += A*B
-#define MATRIX_MUL_ADD(Element, N, K, M, A, B, C) {                \
+#define MATRIX_MUL_ADD(N, K, M, A, B, C) {                         \
   int _i,_j,_k ;                                                   \
   _Pragma("omp parallel for private(_i,_j,_k) shared(A, B, C)")    \
   for(_i=0;_i<N;_i++){                                             \
     for(_j=0;_j<M;_j++){                                           \
-      Element ## _ACC _t ;                                 \
-      Element ## _ACC_ZERO(_t) ;                           \
+      Fql_ACC _t ;                                                 \
+      Fql_ACC_ZERO(_t) ;                                           \
       int k_POOL = k_THRESHOLD ;                                   \
       for(_k=0;_k<K;_k++){                                         \
-        Element ## _ACC_MUL_ADD(A[_i][_k], B[_k][_j], _t) ;     \
+        Fql_ACC_MUL_ADD(A[_i][_k], B[_k][_j], _t) ;                \
       }                                                            \
-      Element _v ;                                                 \
-      Element ## _ACC_REDUCE(_t, _v) ;                     \
-      Element ## _ADD(_v, C[_i][_j], C[_i][_j]) ;                  \
+      Fql _v ;                                                     \
+      Fql_ACC_REDUCE(_t, _v) ;                                     \
+      Fql_ADD(_v, C[_i][_j], C[_i][_j]) ;                          \
     }                                                              \
   }                                                                \
 }
 
 // C = A+B
-#define MATRIX_ADD(Element, N, M, A, B, C) {                 \
+#define MATRIX_ADD(N, M, A, B, C) {                          \
   int _i,_j ;                                                \
   _Pragma("omp parallel for private(_i,_j) shared(A, B, C)") \
   for(_i=0;_i<N;_i++){                                       \
     for(_j=0;_j<M;_j++){                                     \
-      Element ## _ADD(A[_i][_j], B[_i][_j], C[_i][_j]) ;     \
+      Fql_ADD(A[_i][_j], B[_i][_j], C[_i][_j]) ;             \
     }                                                        \
   }                                                          \
 }
 
 // C = A-B
-#define MATRIX_SUB(Element, N, M, A, B, C) {                 \
+#define MATRIX_SUB(N, M, A, B, C) {                          \
   int _i,_j ;                                                \
   _Pragma("omp parallel for private(_i,_j) shared(A, B, C)") \
   for(_i=0;_i<N;_i++){                                       \
     for(_j=0;_j<M;_j++){                                     \
-      Element ## _SUB(A[_i][_j], B[_i][_j], C[_i][_j]) ;     \
+      Fql_SUB(A[_i][_j], B[_i][_j], C[_i][_j]) ;             \
     }                                                        \
   }                                                          \
 }
 
 // C = A^T
-#define MATRIX_TRANSPOSE(Element, N, M, A, C) {           \
+#define MATRIX_TRANSPOSE(N, M, A, C) {                    \
   int _i,_j ;                                             \
   _Pragma("omp parallel for private(_i,_j) shared(A, C)") \
   for(_i=0;_i<N;_i++){                                    \
     for(_j=0;_j<M;_j++){                                  \
-      Element ## _COPY(A[_i][_j], C[_j][_i]) ;            \
+      Fql_COPY(A[_i][_j], C[_j][_i]) ;                    \
     }                                                     \
   }                                                       \
 }
 
-#if (QRUOV_L == 3)
+#define Fql_ACC                              Fql_acc
+#define Fql_ACC_ZERO(A)                      { A = Fql_acc_zero ; }
 
-#  define Fql_ACC                 UINT128_T
-#  define Fql_ACC_ZERO(a)         { a = Fql_acc_zero ; }
+#define k_THRESHOLD                          (1<<(Fql_ws-2*QRUOV_ceil_log_2_q))
 
-#    define k_THRESHOLD                     (1<<(Fql_ws-2*QRUOV_ceil_log_2_q))
-
-#  if (QRUOV_v > k_THRESHOLD)
-#    define Fql_ACC_MUL_ADD(a,b,c)        \
-     {                                       \
-        c += (UINT128_T)a * (UINT128_T)b ;   \
-        k_POOL -= QRUOV_L ;                  \
-        if(k_POOL < QRUOV_L){                \
-          c = Fql_acc_refresh(c) ;  \
-          k_POOL = k_THRESHOLD ;             \
-        } ;                                  \
-     }
-#  else
-#    define Fql_ACC_MUL_ADD(a,b,c)       { c += (UINT128_T)a * (UINT128_T)b ; }
-#  endif
-
-#  define Fql_ACC_REDUCE(a,c)     { c = Fql_acc_reduce(a) ; }
-
-#elif (QRUOV_L == 10)
-
-#  define Fql_ACC                 Fql_acc 
-#  define Fql_ACC_ZERO(a)         { a = Fql_acc_zero ; }
-
-#  define k_THRESHOLD                     (1<<(16-2*QRUOV_ceil_log_2_q))
-#  define k_MASK                          (k_THRESHOLD-1)
-
-#  if (QRUOV_v > k_THRESHOLD)
-#    define Fql_ACC_MUL_ADD(a,b,c)        \
-     {                                       \
-        c = Fql_acc_add(c, Fql_acc_mul(a,b)) ; \
-        k_POOL -= QRUOV_L ;                  \
-        if(k_POOL < QRUOV_L){                \
-          c = Fql_acc_refresh(c) ;  \
-          k_POOL = k_THRESHOLD ;             \
-        } ;                                  \
-     }
-#  else
-#    define Fql_ACC_MUL_ADD(a,b,c)       { c = Fql_acc_add(c, Fql_acc_mul(a,b)) ; }
-#  endif
-
-#  define Fql_ACC_REDUCE(a,c)     { c = Fql_acc_reduce(a) ; }
-
-#define Fql_ACC_DEBUG                   Fql
-#define Fql_ACC_ZERO_DEBUG(a)           { a = Fql_zero ; }
-#define Fql_ACC_MUL_ADD_DEBUG(a,b,c)         { c = Fql_add(c, Fql_mul(a,b)) ; }
-#define Fql_ACC_REDUCE_DEBUG(a,c)       { c = a ; }
-
+#if QRUOV_L == 3
+#  define k_DELTA                            1
+#elif QRUOV_L == 10
+#  define k_DELTA                            5
 #else
-#  error "unsupported QRUOV_L for matrix.h"
+#  error "unsupported QRUOV_L"
 #endif
 
-#define Fql_ADD(a,b,c)                    { c = Fql_add(a,b) ; }
-#define Fql_SUB(a,b,c)                    { c = Fql_sub(a,b) ; }
-#define Fql_COPY(a,c)                     { c = a ; }
+#if (QRUOV_V * k_DELTA > k_THRESHOLD)
+#  define Fql_ACC_MUL_ADD(A,B,C)             { \
+        C = Fql_acc_add(C, Fql_acc_mul(A,B)) ; \
+        k_POOL -= k_DELTA ;                    \
+        if(k_POOL < k_DELTA){                  \
+          C = Fql_acc_refresh(C) ;             \
+          k_POOL = k_THRESHOLD ;               \
+        } ;                                    \
+     }
+#  define Fql_ACC_DOUBLE(A,C)                { \
+        C = Fql_acc_refresh(A) ;               \
+        C = Fql_acc_add(C,C) ;                 \
+        k_POOL = k_THRESHOLD ;                 \
+     }
+#else
+#  define Fql_ACC_MUL_ADD(A,B,C)             { C = Fql_acc_add(C, Fql_acc_mul(A,B)) ; }
+#  define Fql_ACC_DOUBLE(A,C)                { C = Fql_acc_refresh(A) ; C = Fql_acc_add(C,C) ; }
+#endif
+
+#define Fql_ACC_REDUCE(A,C)                  { C = Fql_acc_reduce(A) ; }
+
+#define Fql_ACC_DEBUG                        Fql
+#define Fql_ACC_ZERO_DEBUG(A)                { A = Fql_zero ; }
+#define Fql_ACC_MUL_ADD_DEBUG(A,B,C)         { C = Fql_add(C, Fql_mul(A,B)) ; }
+#define Fql_ACC_REDUCE_DEBUG(A,C)            { C = A ; }
+
+#define Fql_ADD(A,B,C)                       { C = Fql_add(A,B) ; }
+#define Fql_SUB(A,B,C)                       { C = Fql_sub(A,B) ; }
+#define Fql_COPY(A,C)                        { C = A ; }
 
 void MATRIX_MUL_MxV_VxV(MATRIX_MxV A, MATRIX_VxV B, MATRIX_MxV C){
-  MATRIX_MUL(Fql, QRUOV_M, QRUOV_V, QRUOV_V, A, B, C) ;
+  MATRIX_MUL(QRUOV_M, QRUOV_V, QRUOV_V, A, B, C) ;
 }
 
 void MATRIX_MUL_MxV_VxM(MATRIX_MxV A, MATRIX_VxM B, MATRIX_MxM C){
-  MATRIX_MUL(Fql, QRUOV_M, QRUOV_V, QRUOV_M, A, B, C) ;
+  MATRIX_MUL(QRUOV_M, QRUOV_V, QRUOV_M, A, B, C) ;
 }
 
 void MATRIX_MUL_ADD_MxV_VxM(MATRIX_MxV A, MATRIX_VxM B, MATRIX_MxM C){
-  MATRIX_MUL_ADD(Fql, QRUOV_M, QRUOV_V, QRUOV_M, A, B, C) ;
+  MATRIX_MUL_ADD(QRUOV_M, QRUOV_V, QRUOV_M, A, B, C) ;
 }
 
 void MATRIX_SUB_MxV(MATRIX_MxV A, MATRIX_MxV B, MATRIX_MxV C){
-  MATRIX_SUB(Fql, QRUOV_M, QRUOV_V, A, B, C) ;
+  MATRIX_SUB(QRUOV_M, QRUOV_V, A, B, C) ;
 }
 
 void MATRIX_ADD_MxM(MATRIX_MxM A, MATRIX_MxM B, MATRIX_MxM C){
-  MATRIX_ADD(Fql, QRUOV_M, QRUOV_M, A, B, C) ;
+  MATRIX_ADD(QRUOV_M, QRUOV_M, A, B, C) ;
 }
 
 void MATRIX_TRANSPOSE_VxM(MATRIX_VxM A, MATRIX_MxV C){
-  MATRIX_TRANSPOSE(Fql, QRUOV_V, QRUOV_M, A, C) ;
+  MATRIX_TRANSPOSE(QRUOV_V, QRUOV_M, A, C) ;
 }
 
 void EQN_GEN(VECTOR_V vineger, MATRIX_MxV F2T[QRUOV_m], Fq eqn[QRUOV_m][QRUOV_m]){
@@ -216,37 +199,44 @@ void RESULT_GEN(const QRUOV_P1 P1, const QRUOV_P2T P2T, const QRUOV_P3 P3, const
   int i,j,k ;
 #pragma omp parallel for private(i,j,k) shared(P1, P2T, P3, oil, vineger, msg, result)
   for(i=0; i<QRUOV_m; i++){
-    Fql t ;
     Fql tmp_v [QRUOV_V] ;
     Fql tmp_o [QRUOV_M] ;
+
+    Fql_acc t ;
+    int k_POOL ;
     for(j=0;j<QRUOV_V;j++){
-      t = Fql_zero ;
+      t = Fql_acc_zero ;
+      k_POOL = k_THRESHOLD ;
       for(k=0;k<QRUOV_M;k++){
-        t = Fql_add(t, Fql_mul(P2T[i][k][j],oil[k])) ; // <-
+        Fql_ACC_MUL_ADD(P2T[i][k][j],oil[k], t) ;
       }
-      t = Fql_add(t,t) ;
+      Fql_ACC_DOUBLE(t, t) ;
       for(k=0;k<QRUOV_V;k++){
-        t = Fql_add(t, Fql_mul(P1[i][j][k],vineger[k])) ;
+        Fql_ACC_MUL_ADD(P1[i][j][k],vineger[k], t) ;
       }
-      tmp_v[j] = t ;
+      Fql_ACC_REDUCE(t, tmp_v[j]) ;
     }
 
     for(j=0;j<QRUOV_M;j++){
-      t = Fql_zero ;
+      t = Fql_acc_zero ;
+      k_POOL = k_THRESHOLD ;
       for(k=0;k<QRUOV_M;k++){
-        t = Fql_add(t, Fql_mul(P3[i][j][k],oil[k])) ;
+        Fql_ACC_MUL_ADD(P3[i][j][k],oil[k],t) ;
       }
-      tmp_o[j] = t ;
+      Fql_ACC_REDUCE(t, tmp_o[j]) ;
     }
 
-    t = Fql_zero ;
+    t = Fql_acc_zero ;
+    k_POOL = k_THRESHOLD ;
     for(j=0;j<QRUOV_V;j++){
-      t = Fql_add(t, Fql_mul(vineger[j],tmp_v[j])) ;
+      Fql_ACC_MUL_ADD(vineger[j],tmp_v[j],t) ;
     }
     for(j=0;j<QRUOV_M;j++){
-      t = Fql_add(t, Fql_mul(oil[j],tmp_o[j])) ;
+      Fql_ACC_MUL_ADD(oil[j],tmp_o[j],t) ;
     }
-    if(msg[i] != Fql2Fq(t,QRUOV_perm(0))){ // <-- shrink
+    Fql t_dash ;
+    Fql_ACC_REDUCE(t, t_dash) ;
+    if(msg[i] != Fql2Fq(t_dash,QRUOV_perm(0))){ // <-- shrink
       result[i] = 0 ;
     }else{
       result[i] = 1 ;
