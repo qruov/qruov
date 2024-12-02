@@ -25,3 +25,5 @@
       - strassen algorithm
       - krylov subspace methods
       - montgomery reduction
+- Mon Dec  2 17:59:26 JST 2024
+  - version 2 will be released soon.
