@@ -1,4 +1,8 @@
 ### qruov
+- Fri Dec 13 07:17:14 JST 2024
+  - version 2 is released.
+- Mon Dec  2 18:46:17 JST 2024
+  - version 2 will be released soon.
 - Wed May 31 03:08:39 JST 2023
   - done:
     - sha2_evp
@@ -25,5 +29,3 @@
       - strassen algorithm
       - krylov subspace methods
       - montgomery reduction
-- Mon Dec  2 18:46:17 JST 2024
-  - version 2 will be released soon.
