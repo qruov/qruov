@@ -1,13 +1,19 @@
-### find\_tau
+### find\_tau : find tau s.t. lambda = minus_log_2_P(n, tau, p) ; 
 
-How to compile:
+How to build:
 
-1. Install "GNU Scientific Library (GSL) -- development package".
-   On Ubuntu, type the following in the command line shell.
+0. Install a C compiler if necessary. For example, if you are using
+   ubuntu, type the following into the command line shell.
+
+   $ sudo apt -y install build-essential
+
+1. Install "GNU Scientific Library (GSL) -- development package"
+   if necessary. For example, if you are using ubuntu, type the
+   following into the command line shell.
 
    $ sudo apt -y install libgsl-dev
 
-2. Make it.
-   On Ubuntu, type the following in the command line shell.
+2. Make it if necessary. For example, if you are using ubuntu,
+   type the following into the command line shell.
 
    $ make
