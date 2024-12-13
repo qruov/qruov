@@ -1,8 +1,8 @@
 ### find\_tau : 
 
-Find $\tau=\min(t)$ s.t. $\lambda\le-\log_2P(n,t,p)$ where $P(n,t,p)$ is
-the probability $P$ of observing $n$ or grater than $n$ independent
-events each of probability $p$ after $t$ Bernoulli trials.
+Find $\tau=\min\left\{t\in\mathbb{N}\mid{}P(n,t,p)\le2^{-\lambda}\right\}$
+where $P$ is the probability of less than $n$ successes in $t$
+independent Bernoulli trials of success probability $p$.
 
 How to build:
 
