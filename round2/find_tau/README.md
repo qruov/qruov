@@ -9,9 +9,9 @@ which denotes the probability of less than $n'$ successes in $t$ independent Ber
 of success probability $p$. $I_{z}(a,b)$ is called the regularized incomplete beta function
 which is well known in statistics, and many numerical packages provide functions to compute it.
 By combining such a function with some root-finding algorithm, $\tau_{q,\lambda}(n')$ can be
-easelly evaluated. Although find\_tau employs the bisection method as a root-finding algorithm
-for simplicity, more efficient methods like the Newton's method should be employed to evaluate
-tau on the fly in cryptographic functions.
+easelly evaluated. `find\_tau` employs the bisection method as a root-finding algorithm
+for simplicity. However, more efficient methods like the Newton's one should be employed
+to evaluate $\tau$ on the fly in cryptographic functions.
 
 How to build:
 
