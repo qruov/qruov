@@ -24,6 +24,8 @@ static double minus_log_2_P(const double n, const double t, const double p){
   return - ln_I(1-p, t - n + 1, n) / M_LN2 ;
 }
 
+// find tau s.t. lambda = minus_log_2_P(n, tau, p) ; 
+
 double tau(const double q, const double lambda, const double n){
   double r = 1   ;
   for(;r<q;r+=r) ;
