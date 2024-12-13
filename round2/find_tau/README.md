@@ -1,6 +1,6 @@
 ### find\_tau : 
 
-Find $\tau=\min\left\{t\in\mathbb{N}\mid{}P(n,t,p)\le2^{-\lambda}\right\}$
+Find $\tau=\min\{t\in\mathbb{N}\mid{}P(n,t,p)\le2^{-\lambda}\}$
 where $P$ is the probability of less than $n$ successes in $t$
 independent Bernoulli trials of success probability $p$.
 
