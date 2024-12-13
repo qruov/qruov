@@ -1,4 +1,8 @@
-### find\_tau : find $\tau$ s.t. $\lambda=-\log_2P(n,\tau,p)$ ; 
+### find\_tau : 
+
+Find $\tau$ s.t. $\lambda=-\log_2P(n,\tau,p)$ where $P(n,\tau,p)$ is
+the probability $P$ of observing $n$ or grater than $n$ independent
+events each of probability p after $\tau$ Bernoulli trials.
 
 How to build:
 
