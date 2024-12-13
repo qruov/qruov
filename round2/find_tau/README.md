@@ -1,7 +1,7 @@
 ### `find_tau` :
 
 Given $\lambda,q,\ell,v,m$, `find_tau` finds
-$`\tau_{q,\lambda}(n'):=\min{}\{t\in\mathbb{N}\mid{}P(n',t,q/2^{\lceil\log_2q\rceil})\le2^{-\lambda}\}`$ for some $n'$.
+$`\tau_{q,\lambda}(n'):=\min{}\{t\in\mathbb{N}\mid{}P(n',t,q/2^{\lceil\log_2q\rceil})\le2^{-\lambda}\}`$ for some $n'(\ell,v,m)$.
 $P(n',t,p)$ is the cumulative binomial distribution,
 
 $$ P(n',t,p) := \sum_{i=0}^{n'-1} \binom{t}{i} p^i (1-p)^{t-i} = I_{1-p}(t-n'+1,n'), $$
