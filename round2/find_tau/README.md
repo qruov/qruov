@@ -1,8 +1,8 @@
 ### find\_tau : 
 
-Find $\tau=\min[t\in\mathbb{N}\mid{}P(n,t,p)\le2^{-\lambda}]$
-where $P$ is the probability of less than $n$ successes in $t$
-independent Bernoulli trials of success probability $p$.
+For given $q,\lambda,n$, find $\tau_{q,\lambda}(n)=\min{}t\in\mathbb{N}$
+s.t. $P(n,t,q/2^{\lceil\log_2q\rceil})\le2^{-\lambda}$ where
+$P(n,t,p)$ is the cumulative binomial distribution.
 
 How to build:
 
