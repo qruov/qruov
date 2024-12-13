@@ -1,6 +1,6 @@
 ### find\_tau : 
 
-Find $\tau=\min(t)$ s.t. $\lambda\ge-\log_2P(n,t,p)$ where $P(n,t,p)$ is
+Find $\tau=\min(t)$ s.t. $\lambda\le-\log_2P(n,t,p)$ where $P(n,t,p)$ is
 the probability $P$ of observing $n$ or grater than $n$ independent
 events each of probability $p$ after $t$ Bernoulli trials.
 
