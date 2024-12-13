@@ -1,8 +1,8 @@
 ### find\_tau : 
 
-Find $\tau$ s.t. $\lambda=-\log_2P(n,\tau,p)$ where $P(n,\tau,p)$ is
+Find $\tau=\min(t)$ s.t. $\lambda\ge-\log_2P(n,t,p)$ where $P(n,t,p)$ is
 the probability $P$ of observing $n$ or grater than $n$ independent
-events each of probability p after $\tau$ Bernoulli trials.
+events each of probability $p$ after $t$ Bernoulli trials.
 
 How to build:
 
