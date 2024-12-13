@@ -1,4 +1,4 @@
-### find\_tau : find $ \tau $ s.t. $ \lambda = - \log_2 P(n, \tau, p) $ ; 
+### find\_tau : find $\tau$ s.t. $\lambda=-\log_2P(n,\tau,p)$ ; 
 
 How to build:
 
