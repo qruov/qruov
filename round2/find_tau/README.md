@@ -16,7 +16,7 @@ to evaluate $\tau$ on the fly in cryptographic functions.
 Or an appropriate upper bound or pre-calculated value could be used.
 Using Chernoff bounds, we can obtain an upper bound of $\tau$ as follows.
 
-$$ \tau \le \left\lceil \left(n''  + \sqrt{{n''}^2 - (n'-1)^2}\right)\frac{2^\lceil\log_2q\rceil}{q} \right\rceil $$
+$$ \tau \le \left\lceil \left(n''  + \sqrt{{n''}^2 - (n'-1)^2}\right)\frac{2^{\lceil\log_2q\rceil}}{q} \right\rceil $$
 
 where $` n'' := n' - 1 + \lambda/\log_2e `$.
 
