@@ -9,9 +9,16 @@ $$ P(n',t,p) := \sum_{i=0}^{n'-1} \binom{t}{i} p^i (1-p)^{t-i} = I_{1-p}(t-n'+1,
 which denotes the probability of less than $n'$ successes in $t$ independent Bernoulli trials of success probability $p$. 
 $I_{z}(a,b)$ is called the regularized incomplete beta function which is well known in statistics,
 and many numerical packages provide functions to compute it.
-By combining such a function with some root-finding algorithm, $\tau_{q,\lambda}(n')$ can be easelly evaluated.
+By combining such a function with some root-finding algorithm, $\tau_{q,\lambda}(n')$ can be directly evaluated.
 For simplicity, `find_tau` employs the bisection method as a root-finding algorithm.
-However, more efficient methods like the Newton's one should be employed to evaluate $\tau$ on the fly in cryptographic functions.
+However, more efficient methods like the Newton's one should be employed
+to evaluate $\tau$ on the fly in cryptographic functions.
+Or an appropriate upper bound or pre-calculated value could be used.
+Using Chernoff bounds, we can obtain an upper bound of $\tau$ as follows.
+
+$$ \tau \le \left\lceil {n''  + \sqrt{{n''}^2 - {n'-1}^2}}\frac{2^\lceil\log_2q\rceil}{q} \right\rceil $$
+
+where $` n'' := n' - 1 + \lambda/\log_2e `$.
 
 How to build:
 
