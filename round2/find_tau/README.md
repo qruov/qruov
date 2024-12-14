@@ -13,8 +13,8 @@ By combining such a function with some root-finding algorithm, $\tau_{q,\lambda}
 For simplicity, `find_tau` employs the bisection method as a root-finding algorithm.
 However, more efficient methods like the Newton's one should be employed
 to evaluate $\tau$ on the fly in cryptographic functions.
-Or an appropriate upper bound or pre-calculated value could be used.
-Using Chernoff bounds, we can obtain an upper bound of $\tau$ as follows.
+Or some appropriate upper bounds or pre-calculated value can be used.
+Using Chernoff bounds, we can obtain an upper bound of $\tau_{q,\lambda}(n')$ as follows.
 
 $$ \tau \le \left\lceil \left(n''  + \sqrt{{n''}^2 - (n'-1)^2}\right)\frac{2^{\lceil\log_2q\rceil}}{q} \right\rceil $$
 
