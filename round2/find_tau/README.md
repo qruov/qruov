@@ -16,7 +16,7 @@ to evaluate $\tau$ on the fly in cryptographic functions.
 Or some appropriate upper bounds or pre-calculated value can be used.
 Using Chernoff bounds, we can obtain an upper bound of $\tau_{q,\lambda}(n)$ as follows.
 
-$$ \tau \le \left\lceil \left(m-1 + \sqrt{(m-1)^2 - (n-1)^2}\right)\frac{2^{\lceil\log_2q\rceil}}{q} \right\rceil $$
+$$ \tau \le \left\lceil \left(m-1 + \sqrt{(m-1)^2 - (n-1)^2}\right)\cdot\frac{2^{\lceil\log_2q\rceil}}{q} \right\rceil $$
 
 where $` m := n + \lambda/\log_2e `$.
 
