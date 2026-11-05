@@ -1,5 +1,7 @@
 ### qruov
-
+- Thu Nov  5 21:10:08 JST 2026
+  - A new repository was created to merge pull requests.
+    - [the Round 3 Reference Implementation of qruov](https://github.com/qruov/round3-liboqs)
 - Mon Sep  7 19:34:05 JST 2026
   - [the Round 3 Reference Implementation of qruov](https://github.com/qruov/round3)
   - [KAT for round 3](https://github.com/qruov/kat/tree/main/round3)
